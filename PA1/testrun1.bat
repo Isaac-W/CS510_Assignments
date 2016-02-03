@@ -1,0 +1,1 @@
+python27 transform.py ..\AfflineTransformationTrafficVideoExample\a.flv ..\PA1\points.txt .\out.avi

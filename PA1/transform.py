@@ -2,6 +2,41 @@ import sys
 import numpy as np
 import cv2
 
+# XXX This code needs to be cleaned up.
+# I hacked it together very quickly.
+# I would think there would be lots of bugs.
+def ApplyTranformationToEachFrameInTheVideo( sourceFile, transformation, destFile):
+    
+
+    cap = cv2.VideoCapture(sourceFile)
+    videoCodec = cv2.VideoWriter_fourcc(*'XVID')
+    
+    M = transformation
+
+
+    # take first frame of the video
+    ret,frame = cap.read()
+    rows, cols = np.size(frame,0),np.size(frame,1)
+    destWriter = cv2.VideoWriter(destFile,videoCodec, 20.0, (cols,rows))
+    while(1):
+        ret ,frame = cap.read()
+        if ret == True:
+            rows, cols = np.size(frame,0),np.size(frame,1)
+            
+            # Draw it on image
+            img2 = cv2.warpAffine(frame, M, (cols, rows))
+            destWriter.write(img2)
+            cv2.imshow('img2',img2)
+            k = cv2.waitKey(60) & 0xff
+            if k == 27:
+                break
+            #else:
+            #    cv2.imwrite(chr(k)+".jpg",img2)
+        else:
+            break
+    destWriter.release()
+    cv2.destroyAllWindows()
+    cap.release()
 
 def main():
     args = sys.argv[1:] # Remove first argument
@@ -45,7 +80,8 @@ def main():
 
     # Get appropriate transformation matrix
     if len(src) == 2:
-        # TODO
+        # TODO It takes a point and a rotation angle instead of two points.
+        # Maybe there is another function.
         transform = cv2.getRotationMatrix2D()
     elif len(src) == 3:
         transform = cv2.getAffineTransform(src, dst)
@@ -57,6 +93,9 @@ def main():
 
     # TODO Open source/destination videos and transform each frame
     print transform
+    ApplyTranformationToEachFrameInTheVideo( source_path, transform, output_path )
+
+
 
 
 if __name__ == '__main__':
