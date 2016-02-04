@@ -77,18 +77,24 @@ def getSimilarityTransform(src, dst):
 
 def applyVideoTransformation(source_path, transform, output_path):
     cap = cv2.VideoCapture(source_path)
+    if not cap.isOpened():
+        print 'Error--Unable to open video:', source_path
+        return
 
-    # Get video parameters
+    # Get video parameters (try to retain same attributes for output video)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = float(cap.get(cv2.CAP_PROP_FPS))
-    codec = cap.get(cv2.CAP_PROP_FOURCC)
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Fix codec
     if codec == 0:
         codec = cv2.VideoWriter_fourcc(*'MJPG')
 
     dst_writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
+    if not dst_writer.isOpened():
+        print 'Error--Could not write to video:', output_path
+        return
 
     while True:
         # Get frame
@@ -129,8 +135,8 @@ def main():
                     # Skip lines with less than the 4 necessary values
                     continue
 
-                src.append([int(values[1]), int(values[0])])    # Store values as (y, x) -- for OpenCV
-                dst.append([int(values[3]), int(values[2])])
+                src.append([int(values[0]), int(values[1])])
+                dst.append([int(values[2]), int(values[3])])
     except IOError:
         print 'Error--File not found:', points_path
         return
