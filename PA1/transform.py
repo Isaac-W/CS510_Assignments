@@ -3,41 +3,21 @@ import numpy as np
 import cv2
 
 
-# XXX This code needs to be cleaned up.
-# I hacked it together very quickly.
-# I would think there would be lots of bugs.
-def ApplyTranformationToEachFrameInTheVideo( sourceFile, transformation, destFile):
-    
+def getTransform(src, dst):
+    # Get appropriate transformation matrix (and normalize to perspective transformation matrix)
+    if len(src) == 2:
+        transform = getSimilarityTransform(src, dst)
+        transform = np.append(transform, [[0, 0, 1]], 0)
+    elif len(src) == 3:
+        transform = cv2.getAffineTransform(src, dst)
+        transform = np.append(transform, [[0, 0, 1]], 0)
+    elif len(src) == 4:
+        transform = cv2.getPerspectiveTransform(src, dst)
+    else:
+        print 'Error--Unexpected number of points (expected 2-4, got {})'.format(len(src))
+        return None
 
-    cap = cv2.VideoCapture('D:\\Working\\CS510_Assignments\\AfflineTransformationTrafficVideoExample\\a.flv')
-    videoCodec = cv2.VideoWriter_fourcc(*'XVID')
-    
-    M = transformation
-
-
-    # take first frame of the video
-    ret,frame = cap.read()
-    rows, cols = np.size(frame,0),np.size(frame,1)
-    destWriter = cv2.VideoWriter(destFile,videoCodec, 20.0, (cols,rows))
-    while(1):
-        ret ,frame = cap.read()
-        if ret == True:
-            rows, cols = np.size(frame,0),np.size(frame,1)
-            
-            # Draw it on image
-            img2 = cv2.warpPerspective(frame, M, (cols, rows))
-            destWriter.write(img2)
-            cv2.imshow('img2',img2)
-            k = cv2.waitKey(60) & 0xff
-            if k == 27:
-                break
-            #else:
-            #    cv2.imwrite(chr(k)+".jpg",img2)
-        else:
-            break
-    destWriter.release()
-    cv2.destroyAllWindows()
-    cap.release()
+    return transform
 
 
 def getSimilarityTransform(src, dst):
@@ -87,12 +67,41 @@ def getSimilarityTransform(src, dst):
     d = val[3][0]
 
     # Make output transformation matrix (2 X 3)
-    out = np.array([
+    transform = np.array([
         [ a, b, c],
         [-b, a, d]
     ], np.float32)
 
-    return out
+    return transform
+
+
+def applyVideoTransformation(source_path, transform, output_path):
+    cap = cv2.VideoCapture(source_path)
+
+    # Get video parameters
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = cap.get(cv2.CAP_PROP_FOURCC)
+
+    # Fix codec
+    if codec == 0:
+        codec = cv2.VideoWriter_fourcc(*'MJPG')
+
+    dst_writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
+
+    while True:
+        # Get frame
+        ret, frame = cap.read()
+        if ret is False or frame is None:
+            break
+
+        # Transform frame
+        frame = cv2.warpPerspective(frame, transform, (width, height))
+        dst_writer.write(frame)
+
+    dst_writer.release()
+    cap.release()
 
 
 def main():
@@ -129,28 +138,13 @@ def main():
         print 'Error--Points must be integer values'
         return
 
-    # Do OpenCV stuff
-
     # Convert to numpy arrays
     src = np.array(src, np.float32)
     dst = np.array(dst, np.float32)
 
-    # Get appropriate transformation matrix (and normalize to perspective transformation matrix)
-    if len(src) == 2:
-        transform = getSimilarityTransform(src, dst)
-        transform = np.append(transform, [[0, 0, 1]], 0)
-    elif len(src) == 3:
-        transform = cv2.getAffineTransform(src, dst)
-        transform = np.append(transform, [[0, 0, 1]], 0)
-    elif len(src) == 4:
-        transform = cv2.getPerspectiveTransform(src, dst)
-    else:
-        print 'Error--Unexpected number of points (expected 2-4, got {})'.format(len(src))
-        return
-
-    # TODO Open source/destination videos and transform each frame
-    print transform
-    ApplyTranformationToEachFrameInTheVideo( source_path, transform, output_path )
+    # Get transformation matrix
+    transform = getTransform(src, dst)
+    applyVideoTransformation(source_path, transform, output_path)
 
 
 if __name__ == '__main__':
