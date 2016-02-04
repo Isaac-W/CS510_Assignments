@@ -1,7 +1,43 @@
 import sys
 import numpy as np
 import cv2
-import time
+
+
+# XXX This code needs to be cleaned up.
+# I hacked it together very quickly.
+# I would think there would be lots of bugs.
+def ApplyTranformationToEachFrameInTheVideo( sourceFile, transformation, destFile):
+    
+
+    cap = cv2.VideoCapture('D:\\Working\\CS510_Assignments\\AfflineTransformationTrafficVideoExample\\a.flv')
+    videoCodec = cv2.VideoWriter_fourcc(*'XVID')
+    
+    M = transformation
+
+
+    # take first frame of the video
+    ret,frame = cap.read()
+    rows, cols = np.size(frame,0),np.size(frame,1)
+    destWriter = cv2.VideoWriter(destFile,videoCodec, 20.0, (cols,rows))
+    while(1):
+        ret ,frame = cap.read()
+        if ret == True:
+            rows, cols = np.size(frame,0),np.size(frame,1)
+            
+            # Draw it on image
+            img2 = cv2.warpPerspective(frame, M, (cols, rows))
+            destWriter.write(img2)
+            cv2.imshow('img2',img2)
+            k = cv2.waitKey(60) & 0xff
+            if k == 27:
+                break
+            #else:
+            #    cv2.imwrite(chr(k)+".jpg",img2)
+        else:
+            break
+    destWriter.release()
+    cv2.destroyAllWindows()
+    cap.release()
 
 
 def getSimilarityTransform(src, dst):
@@ -45,10 +81,10 @@ def getSimilarityTransform(src, dst):
     val = np.matmul(mat, vec)
 
     # Get elements
-    a = val[0]
-    b = val[1]
-    c = val[2]
-    d = val[3]
+    a = val[0][0]
+    b = val[1][0]
+    c = val[2][0]
+    d = val[3][0]
 
     # Make output transformation matrix (2 X 3)
     out = np.array([
@@ -113,6 +149,8 @@ def main():
         return
 
     # TODO Open source/destination videos and transform each frame
+    print transform
+    ApplyTranformationToEachFrameInTheVideo( source_path, transform, output_path )
 
 
 if __name__ == '__main__':
