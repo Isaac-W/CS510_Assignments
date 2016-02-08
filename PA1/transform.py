@@ -110,9 +110,78 @@ def applyVideoTransformation(source_path, transform, output_path):
     dst_writer.release()
     cap.release()
 
+def applyFourierTransform(source_path, output_path):
+    cap = cv2.VideoCapture(source_path)
+    if not cap.isOpened():
+        print 'Error--Unable to open video:', source_path
+        return
+
+    # Get video parameters (try to retain same attributes for output video)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+
+    # Fix codec
+    #if codec == 0:
+    #    codec = cv2.VideoWriter_fourcc(*'MJPG')
+
+    dst_writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
+    if not dst_writer.isOpened():
+        print 'Error--Could not write to video:', output_path
+        return
+
+    while True:
+        # Get frame
+        ret, frame = cap.read()
+        if ret is False or frame is None:
+            break
+
+
+        from matplotlib import pyplot as plt
+
+        # img = cv2.imread('xfiles.jpg',0)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        f = np.fft.fft2(img)
+        fshift = np.fft.fftshift(f)
+        # magnitude_spectrum = 20*np.log(np.abs(fshift))
+
+        # plt.subplot(121),plt.imshow(img, cmap = 'gray')
+        # plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+        # plt.subplot(122),plt.imshow(magnitude_spectrum, cmap = 'gray')
+        # plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
+        # plt.show()
+
+        rows, cols = img.shape
+        crow,ccol = rows/2 , cols/2
+        fshift[crow-30:crow+30, ccol-30:ccol+30] = 0
+        f_ishift = np.fft.ifftshift(fshift)
+        img_back = np.fft.ifft2(f_ishift)
+        img_back = np.abs(img_back)
+
+        plt.subplot(131),plt.imshow(img, cmap = 'gray')
+        plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+        plt.subplot(132),plt.imshow(img_back, cmap = 'gray')
+        plt.title('Image after HPF'), plt.xticks([]), plt.yticks([])
+        plt.subplot(133),plt.imshow(img_back)
+        plt.title('Result in JET'), plt.xticks([]), plt.yticks([])
+
+        plt.show()
+
+
+        # print type(frame)
+        # print type(np.float32(frame))
+        # dft = cv2.dft(np.float32(frame),flags = cv2.DFT_COMPLEX_OUTPUT)
+        #dft_shift = np.fft.fftshift(dft)
+        # print type(dft)
+        # print type(dft_shift)
+        # dst_writer.write(frame)
+
+
+    dst_writer.release()
+    cap.release()
 
 def main():
-    print 'hi'
     if len(sys.argv) < 4:
         print 'usage: transform.py source points output'
         return
@@ -123,6 +192,9 @@ def main():
     source_path = sys.argv[1]
     points_path = sys.argv[2]
     output_path = sys.argv[3]
+    flag = None
+    if len(sys.argv) is 5:
+        flag = sys.argv[4]
 
     # Read points file
     try:
@@ -153,6 +225,10 @@ def main():
     # Get transformation matrix
     transform = getTransform(src, dst)
     applyVideoTransformation(source_path, transform, output_path)
+    if flag is 'f':
+        applyFourierTransform(source_path, 'fourier.avi')
+
+
 
 
 if __name__ == '__main__':
