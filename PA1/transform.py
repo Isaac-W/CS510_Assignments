@@ -14,7 +14,8 @@ def getTransform(src, dst):
     elif len(src) == 4:
         transform = cv2.getPerspectiveTransform(src, dst)
     else:
-        print 'Error--Unexpected number of points (expected 2-4, got {})'.format(len(src))
+        #print 'Error--Unexpected number of points (expected 2-4, got {})'.format(len(src))
+        print 'error'
         return None
 
     return transform
@@ -88,8 +89,8 @@ def applyVideoTransformation(source_path, transform, output_path):
     codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Fix codec
-    if codec == 0:
-        codec = cv2.VideoWriter_fourcc(*'MJPG')
+    #if codec == 0:
+    #    codec = cv2.VideoWriter_fourcc(*'MJPG')
 
     dst_writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
     if not dst_writer.isOpened():
@@ -111,6 +112,7 @@ def applyVideoTransformation(source_path, transform, output_path):
 
 
 def main():
+    print 'hi'
     if len(sys.argv) < 4:
         print 'usage: transform.py source points output'
         return
