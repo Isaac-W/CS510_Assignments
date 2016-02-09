@@ -1,3 +1,9 @@
+# transform.py
+#
+# Fourier Transform method includes code from:
+# http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_transforms/py_fourier_transform/py_fourier_transform.html
+# http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_feature2d/py_fast/py_fast.html
+
 import sys
 import numpy as np
 import cv2
@@ -105,12 +111,17 @@ def applyVideoTransformation(source_path, transform, output_path):
 
         # Transform frame
         frame = cv2.warpPerspective(frame, transform, (width, height))
+        # print frame[0][0]
         dst_writer.write(frame)
 
     dst_writer.release()
     cap.release()
 
-def applyFourierTransform(source_path, output_path):
+
+def applyFourierTransform(source_path):
+
+    outputPaths = ['magnitude.avi', 'edges.avi', 'corners.avi']
+
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
         print 'Error--Unable to open video:', source_path
@@ -126,9 +137,19 @@ def applyFourierTransform(source_path, output_path):
     #if codec == 0:
     #    codec = cv2.VideoWriter_fourcc(*'MJPG')
 
-    dst_writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
-    if not dst_writer.isOpened():
-        print 'Error--Could not write to video:', output_path
+    magnitude_writer = cv2.VideoWriter(outputPaths[0], codec, fps, (width, height))
+    if not magnitude_writer.isOpened():
+        print 'Error--Could not write to magnitude video:', outputPaths[0]
+        return
+
+    edges_writer = cv2.VideoWriter(outputPaths[1], codec, fps, (width, height))
+    if not edges_writer.isOpened():
+        print 'Error--Could not write to edges video:', outputPaths[1]
+        return
+
+    corners_writer = cv2.VideoWriter(outputPaths[2], codec, fps, (width, height))
+    if not corners_writer.isOpened():
+        print 'Error--Could not write to corners video:', outputPaths[2]
         return
 
     while True:
@@ -137,49 +158,63 @@ def applyFourierTransform(source_path, output_path):
         if ret is False or frame is None:
             break
 
+        img_cornerOut, img_edges_out, magImg = processFrameFourier(frame)
 
-        from matplotlib import pyplot as plt
+        # print img_edges_out[0][0]
+        magnitude_writer.write(magImg)
+        edges_writer.write(img_edges_out)
+        corners_writer.write(img_cornerOut)
 
-        # img = cv2.imread('xfiles.jpg',0)
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        f = np.fft.fft2(img)
-        fshift = np.fft.fftshift(f)
-        # magnitude_spectrum = 20*np.log(np.abs(fshift))
-
-        # plt.subplot(121),plt.imshow(img, cmap = 'gray')
-        # plt.title('Input Image'), plt.xticks([]), plt.yticks([])
-        # plt.subplot(122),plt.imshow(magnitude_spectrum, cmap = 'gray')
-        # plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
-        # plt.show()
-
-        rows, cols = img.shape
-        crow,ccol = rows/2 , cols/2
-        fshift[crow-30:crow+30, ccol-30:ccol+30] = 0
-        f_ishift = np.fft.ifftshift(fshift)
-        img_back = np.fft.ifft2(f_ishift)
-        img_back = np.abs(img_back)
-
-        plt.subplot(131),plt.imshow(img, cmap = 'gray')
-        plt.title('Input Image'), plt.xticks([]), plt.yticks([])
-        plt.subplot(132),plt.imshow(img_back, cmap = 'gray')
-        plt.title('Image after HPF'), plt.xticks([]), plt.yticks([])
-        plt.subplot(133),plt.imshow(img_back)
-        plt.title('Result in JET'), plt.xticks([]), plt.yticks([])
-
-        plt.show()
-
-
-        # print type(frame)
-        # print type(np.float32(frame))
-        # dft = cv2.dft(np.float32(frame),flags = cv2.DFT_COMPLEX_OUTPUT)
-        #dft_shift = np.fft.fftshift(dft)
-        # print type(dft)
-        # print type(dft_shift)
-        # dst_writer.write(frame)
-
-
-    dst_writer.release()
+    magnitude_writer.release()
+    edges_writer.release()
+    corners_writer.release()
     cap.release()
+
+
+def processFrameFourier(frame):
+    img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # convert frame to gray
+    f = np.fft.fft2(img)  # compute FFT for frame
+    fshift = np.fft.fftshift(f)  # shift zero frequency components to image center
+    magnitude_spectrum = 20 * np.log(np.abs(fshift))  # convert to magnitude
+    magnitude_spectrum = magnitude_spectrum.astype('u1')  # cast to correct type for image
+
+    # Convert gray FFT image back to color image to write out (alternatively, use single channel writer)
+    magImg = np.zeros_like(frame)
+    magImg[:, :, 0] = magnitude_spectrum
+    magImg[:, :, 1] = magnitude_spectrum
+    magImg[:, :, 2] = magnitude_spectrum
+
+    # Run high pass filter to emphasize edges
+    rows, cols = img.shape
+    crow, ccol = rows / 2, cols / 2
+    fshift[crow - 30:crow + 30, ccol - 30:ccol + 30] = 0
+    f_ishift = np.fft.ifftshift(fshift)
+    img_edges = np.fft.ifft2(f_ishift)
+    img_edges = np.abs(img_edges)
+    img_edges = img_edges.astype('u1')  # cast to correct type
+
+    # Convert gray image to color image
+    img_edges_out = np.zeros_like(frame)
+    img_edges_out[:, :, 0] = img_edges
+    img_edges_out[:, :, 1] = img_edges
+    img_edges_out[:, :, 2] = img_edges
+    img_cornerOut = fastFeatureDetect(img_edges_out)
+    return img_cornerOut, img_edges_out, magImg
+
+
+def fastFeatureDetect(img):
+
+    # cv2.imshow('res',img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    # Initiate FAST object with default values
+    fast = cv2.FastFeatureDetector_create()
+
+    # find and draw the keypoints
+    kp = fast.detect(img,None)
+    return cv2.drawKeypoints(img, kp, None, color=(255,0,0))
+
 
 def main():
     if len(sys.argv) < 4:
@@ -226,10 +261,7 @@ def main():
     transform = getTransform(src, dst)
     applyVideoTransformation(source_path, transform, output_path)
     if flag is 'f':
-        applyFourierTransform(source_path, 'fourier.avi')
-
-
-
+        applyFourierTransform(source_path)
 
 if __name__ == '__main__':
     main()
