@@ -21,7 +21,7 @@ def getTransform(src, dst):
         transform = cv2.getPerspectiveTransform(src, dst)
     else:
         #print 'Error--Unexpected number of points (expected 2-4, got {})'.format(len(src))
-        print 'error'
+        print 'Error--Unexpected number of points'
         return None
 
     return transform
@@ -35,15 +35,15 @@ def getSimilarityTransform(src, dst):
         return None
 
     # Separate points
-    y1 = src[0][0]
-    x1 = src[0][1]
-    y2 = src[1][0]
-    x2 = src[1][1]
+    x1 = src[0][0]
+    y1 = src[0][1]
+    x2 = src[1][0]
+    y2 = src[1][1]
 
-    v1 = dst[0][0]
-    u1 = dst[0][1]
-    v2 = dst[1][0]
-    u2 = dst[1][1]
+    u1 = dst[0][0]
+    v1 = dst[0][1]
+    u2 = dst[1][0]
+    v2 = dst[1][1]
 
     # Create matrix
     mat = np.array([
