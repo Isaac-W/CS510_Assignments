@@ -65,7 +65,7 @@ def getSimilarityTransform(src, dst):
     ], np.float32)
 
     # Multiply matrices
-    val = np.matmul(mat, vec)
+    val = cv2.gemm(mat, vec, 1.0, None, 0.0)
 
     # Get elements
     a = val[0][0]
