@@ -216,6 +216,44 @@ def fastFeatureDetect(img):
     return cv2.drawKeypoints(img, kp, None, color=(255,0,0))
 
 
+def applyGaussianFilter(source_path):
+    outputName = 'GaussianFiltered.avi'
+
+    cap = cv2.VideoCapture(source_path)
+    if not cap.isOpened():
+        print 'Error--Unable to open video:', source_path
+        return
+
+    # Get video parameters (try to retain same attributes for output video)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+
+    # Fix codec
+    #if codec == 0:
+    #    codec = cv2.VideoWriter_fourcc(*'MJPG')
+
+    dst_writer = cv2.VideoWriter(outputName, codec, fps, (width, height))
+    if not dst_writer.isOpened():
+        print 'Error--Could not write to video:', outputName
+        return
+
+    while True:
+        # Get frame
+        ret, frame = cap.read()
+        if ret is False or frame is None:
+            break
+
+        # Applying Gaussian Filter of size 11x11 and a sigma of 2 in both direction. For reducing sizes in half
+        frame = cv2.GaussianBlur(frame,(11,11),2)
+        # print frame[0][0]
+        dst_writer.write(frame)
+
+    dst_writer.release()
+    cap.release()
+
+
 def main():
     if len(sys.argv) < 4:
         print 'usage: transform.py source points output'
@@ -262,6 +300,8 @@ def main():
     applyVideoTransformation(source_path, transform, output_path)
     if flag is 'f':
         applyFourierTransform(source_path)
+    if flag is 'g':
+        applyGaussianFilter(source_path)
 
 if __name__ == '__main__':
     main()
