@@ -81,7 +81,7 @@ def getSimilarityTransform(src, dst):
     ], np.float32)
 
     return transform
-
+import cv
 
 def applyVideoTransformation(source_path, transform, output_path):
     cap = cv2.VideoCapture(source_path)
@@ -90,10 +90,10 @@ def applyVideoTransformation(source_path, transform, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
+    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -129,10 +129,10 @@ def applyFourierTransform(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
+    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -210,7 +210,7 @@ def fastFeatureDetect(img):
     # cv2.destroyAllWindows()
 
     # Initiate FAST object with default values
-    fast = cv2.FastFeatureDetector_create()
+    fast = cv2.FastFeatureDetector()
 
     # find and draw the keypoints
     kp = fast.detect(img,None)
@@ -226,10 +226,10 @@ def applyGaussianFilter(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
+    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -269,10 +269,10 @@ def createOctivePyramids(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
+    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
     
     octiveOutputWriters=[]
     for path in octiveOutputPathes:
