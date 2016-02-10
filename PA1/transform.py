@@ -253,7 +253,53 @@ def applyGaussianFilter(source_path, output_path):
 
     dst_writer.release()
     cap.release()
+def createOctivePyramids(source_path, output_path):
+    print "source_path", source_path
+    outputFileName, ext = os.path.splitext(output_path)
+    HIGH_OCTIVE = 3
+    octiveOutputPathes=[]
+    for octive in range(1,HIGH_OCTIVE+1):
+        outputName = outputFileName+'-pyramid-octive' + str(octive) +ext
 
+        octiveOutputPathes.append(outputName)
+    
+    cap = cv2.VideoCapture(source_path)
+    if not cap.isOpened():
+        print 'Error--Unable to open video:', source_path
+        return
+
+    # Get video parameters (try to retain same attributes for output video)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    
+    octiveOutputWriters=[]
+    for path in octiveOutputPathes:
+        width = width /2
+        height = height / 2
+        print "opening writer: ", path
+        dst_writer = cv2.VideoWriter(path, codec, fps, (width, height))
+        if not dst_writer.isOpened():
+            print 'Error--Could not write to video:', outputName
+            return
+        octiveOutputWriters.append(dst_writer)
+
+    while True:
+        # Get frame
+        ret, frame = cap.read()
+        if ret is False or frame is None:
+            break
+        lastReduction=frame
+        for writer in octiveOutputWriters:
+            print "writing: ", writer
+            lastReduction = cv2.pyrDown(lastReduction)
+            writer.write(lastReduction)
+    for writer in octiveOutputWriters:
+        print "closing: ", writer
+        writer.release()
+    cap.release()
+   
 
 def main():
     if len(sys.argv) < 4:
@@ -305,6 +351,8 @@ def main():
         applyFourierTransform(source_path, outputFileName)
     if flag is 'g':
         applyGaussianFilter(source_path, outputFileName)
+    if flag is 'p':
+        createOctivePyramids(source_path, output_path)
 
 if __name__ == '__main__':
     main()
