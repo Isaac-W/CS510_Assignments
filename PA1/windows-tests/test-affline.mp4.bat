@@ -1,1 +1,1 @@
-..\run-test.bat "../../assets/short sample video.mp4" "../points-affline.txt" "../out-affline.mp4"
+call ..\run-test.bat "../../assets/short sample video.mp4" "../points-affline.txt" "../out-affline.mp4" 

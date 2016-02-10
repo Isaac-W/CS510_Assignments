@@ -1,0 +1,9 @@
+call test-affline.webm.bat
+call test-afflinefourier.webm.bat
+call test-afflineguassian.webm.bat
+call test-perspective.webm.bat
+call test-perspectivefourier.webm.bat
+call test-perspectiveguassian.webm.bat
+call test-similarity.webm.bat
+call test-similarityfourier.webm.bat
+call test-similarityguassian.webm.bat

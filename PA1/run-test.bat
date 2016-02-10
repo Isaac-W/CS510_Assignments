@@ -1,2 +1,2 @@
 SET script_path=%~dp0
-python27 "%script_path%\transform.py" %*
+call "C:\Python27\python.exe" "%script_path%\transform.py" %*

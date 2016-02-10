@@ -1,0 +1,9 @@
+call test-affline-360p.3gp.bat
+call test-afflinefourier-360p.3gp.bat
+call test-afflineguassian-360p.3gp.bat
+call test-perspective-360p.3gp.bat
+call test-perspectivefourier-360p.3gp.bat
+call test-perspectiveguassian-360p.3gp.bat
+call test-similarity-360p.3gp.bat
+call test-similarityfourier-360p.3gp.bat
+call test-similarityguassian-360p.3gp.bat

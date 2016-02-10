@@ -1,1 +1,1 @@
-..\run-test.bat "../../assets/short sample video.webm" "../points-perspective.txt" "../out-perspectiveguassian.webm" g
+call ..\run-test.bat "../../assets/short sample video.webm" "../points-perspective.txt" "../out-perspectiveguassian.webm" g
