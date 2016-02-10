@@ -7,6 +7,7 @@
 import sys
 import numpy as np
 import cv2
+import os
 
 
 def getTransform(src, dst):
@@ -118,9 +119,9 @@ def applyVideoTransformation(source_path, transform, output_path):
     cap.release()
 
 
-def applyFourierTransform(source_path):
+def applyFourierTransform(source_path, output_path):
 
-    outputPaths = ['magnitude.avi', 'edges.avi', 'corners.avi']
+    outputPaths = [output_path+'magnitude.avi', output_path+'edges.avi', output_path+'corners.avi']
 
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
@@ -216,8 +217,8 @@ def fastFeatureDetect(img):
     return cv2.drawKeypoints(img, kp, None, color=(255,0,0))
 
 
-def applyGaussianFilter(source_path):
-    outputName = 'GaussianFiltered.avi'
+def applyGaussianFilter(source_path, output_path):
+    outputName = output_path+'GaussianFiltered.avi'
 
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
@@ -294,14 +295,16 @@ def main():
     # Convert to numpy arrays
     src = np.array(src, np.float32)
     dst = np.array(dst, np.float32)
+    
+    outputFileName = os.path.splitext(output_path)[0]
 
     # Get transformation matrix
     transform = getTransform(src, dst)
     applyVideoTransformation(source_path, transform, output_path)
     if flag is 'f':
-        applyFourierTransform(source_path)
+        applyFourierTransform(source_path, outputFileName)
     if flag is 'g':
-        applyGaussianFilter(source_path)
+        applyGaussianFilter(source_path, outputFileName)
 
 if __name__ == '__main__':
     main()
