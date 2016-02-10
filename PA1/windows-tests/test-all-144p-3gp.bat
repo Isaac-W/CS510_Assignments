@@ -1,9 +1,12 @@
 call test-affline-144p.3gp.bat
 call test-afflinefourier-144p.3gp.bat
 call test-afflineguassian-144p.3gp.bat
+call test-afflinepyramid-144p.3gp.bat
 call test-perspective-144p.3gp.bat
 call test-perspectivefourier-144p.3gp.bat
 call test-perspectiveguassian-144p.3gp.bat
+call test-perspectivepyramid-144p.3gp.bat
 call test-similarity-144p.3gp.bat
 call test-similarityfourier-144p.3gp.bat
 call test-similarityguassian-144p.3gp.bat
+call test-similaritypyramid-144p.3gp.bat
