@@ -81,7 +81,7 @@ def getSimilarityTransform(src, dst):
     ], np.float32)
 
     return transform
-import cv
+
 
 def applyVideoTransformation(source_path, transform, output_path):
     cap = cv2.VideoCapture(source_path)
@@ -90,10 +90,10 @@ def applyVideoTransformation(source_path, transform, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
-    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -120,8 +120,8 @@ def applyVideoTransformation(source_path, transform, output_path):
 
 
 def applyFourierTransform(source_path, output_path):
-
-    outputPaths = [output_path+'magnitude.avi', output_path+'edges.avi', output_path+'corners.avi']
+    outputName, file_extension = os.path.splitext(output_path)
+    outputPaths = [outputName+'magnitude'+file_extension, outputName+'edges'+file_extension, outputName+'corners'+file_extension]
 
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
@@ -129,10 +129,10 @@ def applyFourierTransform(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
-    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -188,7 +188,7 @@ def processFrameFourier(frame):
     # Run high pass filter to emphasize edges
     rows, cols = img.shape
     crow, ccol = rows / 2, cols / 2
-    fshift[crow - 30:crow + 30, ccol - 30:ccol + 30] = 0
+    fshift[crow - 30:crow + 30, ccol - 30:ccol + 30] = 0 # Create filter window and convolve
     f_ishift = np.fft.ifftshift(fshift)
     img_edges = np.fft.ifft2(f_ishift)
     img_edges = np.abs(img_edges)
@@ -210,7 +210,7 @@ def fastFeatureDetect(img):
     # cv2.destroyAllWindows()
 
     # Initiate FAST object with default values
-    fast = cv2.FastFeatureDetector()
+    fast = cv2.FastFeatureDetector_create()
 
     # find and draw the keypoints
     kp = fast.detect(img,None)
@@ -218,7 +218,8 @@ def fastFeatureDetect(img):
 
 
 def applyGaussianFilter(source_path, output_path):
-    outputName = output_path+'GaussianFiltered.avi'
+    filename, file_extension = os.path.splitext(output_path)
+    outputName = filename+'GaussianFiltered'+file_extension
 
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
@@ -226,10 +227,10 @@ def applyGaussianFilter(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
-    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Fix codec
     #if codec == 0:
@@ -253,15 +254,17 @@ def applyGaussianFilter(source_path, output_path):
 
     dst_writer.release()
     cap.release()
-def createOctivePyramids(source_path, output_path):
-    print "source_path", source_path
-    outputFileName, ext = os.path.splitext(output_path)
-    HIGH_OCTIVE = 3
-    octiveOutputPathes=[]
-    for octive in range(1,HIGH_OCTIVE+1):
-        outputName = outputFileName+'-pyramid-octive' + str(octive) +ext
 
-        octiveOutputPathes.append(outputName)
+
+def createoctavePyramids(source_path, output_path):
+    # print "source_path", source_path
+    outputFileName, ext = os.path.splitext(output_path)
+    HIGH_octave = 3
+    octaveOutputPathes=[]
+    for octave in range(1,HIGH_octave+1):
+        outputName = outputFileName+'-pyramid-octave' + str(octave) +ext
+
+        octaveOutputPathes.append(outputName)
     
     cap = cv2.VideoCapture(source_path)
     if not cap.isOpened():
@@ -269,21 +272,21 @@ def createOctivePyramids(source_path, output_path):
         return
 
     # Get video parameters (try to retain same attributes for output video)
-    width = int(cap.get(cv.CV_CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv.CV_CAP_PROP_FRAME_HEIGHT))
-    fps = float(cap.get(cv.CV_CAP_PROP_FPS))
-    codec = int(cap.get(cv.CV_CAP_PROP_FOURCC))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
     
-    octiveOutputWriters=[]
-    for path in octiveOutputPathes:
+    octaveOutputWriters=[]
+    for path in octaveOutputPathes:
         width = width /2
         height = height / 2
-        print "opening writer: ", path
+        # print "opening writer: ", path
         dst_writer = cv2.VideoWriter(path, codec, fps, (width, height))
         if not dst_writer.isOpened():
             print 'Error--Could not write to video:', outputName
             return
-        octiveOutputWriters.append(dst_writer)
+        octaveOutputWriters.append(dst_writer)
 
     while True:
         # Get frame
@@ -291,12 +294,12 @@ def createOctivePyramids(source_path, output_path):
         if ret is False or frame is None:
             break
         lastReduction=frame
-        for writer in octiveOutputWriters:
-            print "writing: ", writer
+        for writer in octaveOutputWriters:
+            # print "writing: ", writer
             lastReduction = cv2.pyrDown(lastReduction)
             writer.write(lastReduction)
-    for writer in octiveOutputWriters:
-        print "closing: ", writer
+    for writer in octaveOutputWriters:
+        # print "closing: ", writer
         writer.release()
     cap.release()
    
@@ -342,17 +345,17 @@ def main():
     src = np.array(src, np.float32)
     dst = np.array(dst, np.float32)
     
-    outputFileName = os.path.splitext(output_path)[0]
+    # outputFileName = os.path.splitext(output_path)[0]
 
     # Get transformation matrix
     transform = getTransform(src, dst)
     applyVideoTransformation(source_path, transform, output_path)
     if flag is 'f':
-        applyFourierTransform(source_path, outputFileName)
+        applyFourierTransform(source_path, output_path)
     if flag is 'g':
-        applyGaussianFilter(source_path, outputFileName)
+        applyGaussianFilter(source_path, output_path)
     if flag is 'p':
-        createOctivePyramids(source_path, output_path)
+        createoctavePyramids(source_path, output_path)
 
 if __name__ == '__main__':
     main()
