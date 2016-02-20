@@ -8,21 +8,21 @@ Kaden Strand
 Isaac Wang
 
 python version : 2.7 
-opencv version : 3.1
+opencv version : 2.4
 requires numpy python module
 
-How to run: python transform.py arg1 arg2 arg3 arg4
+How to run: python transform.py source points output flag
 
 Argument descriptions:
-arg1 = input video filename
-arg2 = point correspondence text filename
-arg3 = output video filename
-arg4 = optional character argument to specify additional video processing.
+source = input video filename
+points = point correspondence text filename
+output = output video filename
+flag = optional character argument to specify additional video processing.
 Valid characters are 'f', 'g', and 'p'
 
 Regardless of whether arg4 is given, the program will apply the 
 corresponding transformation according to the number of points in the 
-point correspondece file, and write output video to filename given in arg3.
+point correspondence file, and write output video to filename given in arg3.
 
 Example: "python transform.py in.avi points.txt out.avi"
 This command will apply the appropriate point-correspondence transformation 
@@ -43,7 +43,8 @@ written to "outGaussianFiltered.avi"
 If arg4 = 'p': Scale the video by 1, 2 and 3 octaves.
 Example: "python transform.py in.avi points.txt out.avi p"
 In addition to the point transform, the results of the image pyramid will be 
-written to "out-pyramid-octave1.avi", "out-pyramid-octave2.avi", and "out-pyramid-octave3.avi"  
+written to "out-pyramid-octave1.avi", "out-pyramid-octave2.avi", and "out-pyramid-octave3.avi"
+Note: Depending on the codecs used, small octave videos may fail to save (videos too small)
 ----------
 For each of the optional arguments, additional output files will be written in the video format given by arg3.
 Example: "python transform.py in.flv points.txt out.flv f"
