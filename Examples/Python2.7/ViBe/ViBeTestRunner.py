@@ -19,6 +19,7 @@ import sys
 import cv2
 import time
 import os
+import numpy as np
 
 def createVideoWriter(output_file, codec, fps, width, height):
     """
@@ -78,13 +79,13 @@ def main():
     codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Create an a video writer so that the resuls can be saved.
-    writer = createVideoWriter("out" + file_extension, codec, fps, width, height)
+    writer = cv2.VideoWriter("outVibe.avi", codec, fps, (width, height))
     if not writer:
         print 'Error--Could not write to magnitude video:', outputPaths[0]
         return
 
     # Get the first frame and display it.
-    ret, frame = cap.read()
+    #ret, frame = cap.read()
     ret, frame = cap.read()
     cv2.imshow('image', frame)
     k = cv2.waitKey(100)
@@ -131,11 +132,14 @@ def main():
             print "average megapixels a second: %f" % (megapixels/timeForEachFrame)
 
             # Overlay the current frame with the results.
-            channels = cv2.split(frame)
+            #channels = cv2.split(frame)
+            #blank_image = numpy.zeros((height, width), numpy.uint8)
+            #combined = model.foreGround
+            channel = np.zeros((height,width,1), np.uint8)
             combined = cv2.merge((
-                cv2.bitwise_or(channels[0], model.foreGround ),
-                cv2.bitwise_or(channels[1], model.foreGround ),
-                cv2.bitwise_or(channels[2], model.foreGround )
+                cv2.bitwise_or(channel, model.foreGround ),
+                cv2.bitwise_or(channel, model.foreGround ),
+                cv2.bitwise_or(channel, model.foreGround )
             ))
 
             # Show the results and write it to the file buffer.

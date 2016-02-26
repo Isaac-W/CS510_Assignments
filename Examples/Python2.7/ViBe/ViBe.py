@@ -31,6 +31,9 @@ Date:
 # Module imports.
 import cv2
 import numpy as np
+import random
+import math
+import time
 
 # BEGIN MODULE CONSTANTS
 
@@ -52,7 +55,7 @@ PIXEL_MARKER_FOREGROUND=255
 PIXEL_MARKER_BACKGROUND=0
 
 # The data type for pixel arrays in memory.
-NP_ELEMENT_TYPE=np.uint
+NP_ELEMENT_TYPE = np.uint8
 
 # END MODULE CONSTANTS
 
@@ -72,7 +75,7 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20):
+    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 2):
         """
         Description:
             Stores params.
@@ -110,7 +113,7 @@ class Model:
                 the ViBe algorithm to determine which pixels are foreground
                 using the samples.
         """
-        self.foreGround = processChannel(
+        self.foreGround = processFrame(
             frame,
             self.samples,
             self.params
@@ -153,7 +156,7 @@ def init_model(videoCapture, params ):
     h = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     channels = 3#XXX
 
-    ndSize = h, w, channels
+    ndSize = h, w, 1
     foreGround=np.zeros(ndSize, dtype=NP_ELEMENT_TYPE)
 
     return foreGround, samples
@@ -166,26 +169,26 @@ def averageFrames( videoCapture, numberOfFrames ):
     for n in range(1, numberOfFrames ):
         for (r, c ) in TwoVariableIterator( h, w ):
             avg[r,c]=avg[r,c]+frame[r,c]
+        ret, frame = videoCapture.read()
     # Divide
     for (r, c ) in TwoVariableIterator( h, w ):
         avg[r,c]=avg[r,c]/numberOfFrames
     return avg
 
-def processChannel( frameChannel, samples, params ):
+def processFrame( frame, samples, params ):
     """
     Description:
-        Processes a channel to detect the foreground and updates the sample
-        space.
+        Process the frame by checking for the bg pixels and updating them
 
     Args:
-        frameChannel (ndarray (h, w, 1)): A 2D array of the pixels of the
+        frame (ndarray (h, w, ch)): A 2D array of the pixels of the
             current frame for one pixel.
         samples (list): A list samples. Each element is a 2D array of pixels.
             So this param is kind of like a 3D cube.
         params (Params): the params control how the algorithm works.
     """
-    h, w = frameChannel.shape
-    newForeGroundChannel = np.zeros(frameChannel.shape, dtype=NP_ELEMENT_TYPE)
+    h, w, ch = frame.shape
+    newForeGroundChannel = np.zeros((h, w), dtype=NP_ELEMENT_TYPE)
     # This step below actually speeds python up.
     # Turns out that accessing the properties of an object slow it down.
     maxHistory=params.maxHistory
@@ -193,44 +196,49 @@ def processChannel( frameChannel, samples, params ):
     noMin=params.noMin
     # Check each pixel to see if it belongs with the background
     # Leave a border of 1 unit thick.
+
     for (r,c) in TwoVariableIterator(h-1,w-1,1,1):
         # Force the current pixel into an 32-bit.
         # Python has trouble with the subtraction other wise.
-        frameChannelValue=int((frameChannel[r,c]))
-        isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frameChannelValue, noMin, maxHistory, R )
+        #frameChannelValue=int((frameChannel[r,c]))
+        #startTime=time.time()
+        isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frame, noMin, maxHistory, R )
+        #endTime=time.time()
+        #totalTime=endTime-startTime
+        #print "Updating model time: %g" % totalTime
         # Plant seeds for pixels that are part of the background.
         if ( isPixelPartOfBackground ):
             # Set this pixel as part of the bg.
             newForeGroundChannel[r,c]=PIXEL_MARKER_BACKGROUND
             # Detect slow changes in the background
-            rand=0#XXX 
+            phi = 16
+            rand = np.random.random_integers(0,phi-1) #Updating bg with 1/16 probability
             if (rand==0):
                 rndSample=np.random.random_integers(0,maxHistory-1)
-                (samples[rndSample])[r,c]=(frameChannel[r,c])
-            # Allow ghosts to disappear by planting seeds in nearby pixels.
-            rand=0#XXX random phi?
-            if ( rand == 0 ):
+                (samples[rndSample])[r,c]=(frame[r,c])
+                # Allow ghosts to disappear by planting seeds in nearby pixels.
                 rndSample=np.random.random_integers(0,maxHistory-1)
                 rndD=np.random.random_integers(0,7)
                 nc,nr = EightCardinalDirections[rndD]
-                (samples[rndSample])[nr+r,nc+c]=(frameChannel[r,c])
+                (samples[rndSample])[nr+r,nc+c]=(frame[r,c])
         # Set this pixel as part of the fg.
         else:
             newForeGroundChannel[r,c]=PIXEL_MARKER_FOREGROUND
+    # Display time results.
     return newForeGroundChannel
 
-def IsPixelPartOfBackground(samples, r,c, frameValue, noMin, maxHistory, R ):
+def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
     """
     Description:
         Determines if the pixel should be part of the background by looking for
         similarities in the sample space.
 
     Args:
-        samples (list): A list samples. Each element is a 2D array of pixels.
+        channelSamples (list): A list samples. Each element is a 2D array of pixels.
             So this param is kind of like a 3D cube.
         r (int): The current row.
         c (int): The current column.
-        frameValue (int): the value of the current pixel.
+        frame : the frame of the current pixel.
         noMin (int): The threshold that determines if a pixel should belong to
             the background. For example, 2 would mean that there are 2 samples
             that need to be similar.
@@ -241,17 +249,38 @@ def IsPixelPartOfBackground(samples, r,c, frameValue, noMin, maxHistory, R ):
             their channels such as the red channel.
 
     Returns:
-        ndarray (shape=(h,w,1)): Returns the new foreground for the current
-            channel.
+        True if the pixel is background, False if foreground
     """
     count=0
     index=0
     # Go through the samples.
-    while ( index<maxHistory):
+    while (index<maxHistory):
         # Find a measure of the similarity.
-        dist=int((samples[index])[r,c])-frameValue
+        #print (channelSamples[index])[r, c]
+        #print frame.shape
+        if(frame.shape[2] == 3): #If frame has 3 channels (RGB or Lab)
+            #print (channelSamples[index])[r, c]
+            Rs = int((channelSamples[index])[r, c, 0])
+            Gs = int((channelSamples[index])[r, c, 1])
+            Bs = int((channelSamples[index])[r, c, 2])
+            R = int(frame[r, c, 0])
+            G = int(frame[r, c, 1])
+            B = int(frame[r, c, 2])
+            #print (Rs - R)
+            RR = abs(Rs - R)*abs(Rs - R)
+            GG = abs(Gs - G)*abs(Gs - G)
+            BB = abs(Bs - B)*abs(Bs - B)
+            #T = RR + BB + GG
+            #print T
+            #print Rs, Gs, Bs, R, G, B
+            #print np.sqrt((Rs - R)*(Rs - R) + (Gs - G)*(Gs - G) + (Bs - B)*(Bs - B))
+            dist = np.sqrt(RR + GG + BB)
+            #dist = abs(Rs - R) + abs(Gs - G) + abs(Bs - B)
+        else: #Frame has only one channel
+            dist = abs(channelSamples[index][r, c] - frame[r, c])
+
         # Count similar pixels.
-        if ( dist <= R and dist >= -R):
+        if (dist <= R ):
             count = count + 1
             # The pixel is part of the background
             # if we have reached the threshold.
