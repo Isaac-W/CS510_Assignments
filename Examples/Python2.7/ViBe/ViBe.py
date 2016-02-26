@@ -52,7 +52,7 @@ PIXEL_MARKER_FOREGROUND=255
 PIXEL_MARKER_BACKGROUND=0
 
 # The data type for pixel arrays in memory.
-NP_ELEMENT_TYPE=np.uint8
+NP_ELEMENT_TYPE=np.uint
 
 # END MODULE CONSTANTS
 
@@ -72,7 +72,7 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20):
+    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20):
         """
         Description:
             Stores params.
@@ -80,6 +80,7 @@ class Params:
         self.maxHistory = maxHistory
         self.noMin = noMin
         self.R = R
+        self.initFrames = initFrames
 
 class Model:
     """
@@ -87,7 +88,7 @@ class Model:
         Holds the information ViBe will use such as the current foreground
         pixels and the sample space.
     """
-    def __init__(self, firstSample, params = Params()):
+    def __init__(self, videoCapture, params = Params()):
         """
         Description:
             Initializes the model.
@@ -97,7 +98,7 @@ class Model:
                 to initialize the algorithm.
             params (Params): the params control how the algorithm works.
         """
-        self.foreGroundChannels, self.samplesArray, self.foreGround = init_model(firstSample, params)
+        self.foreGround, self.samples = init_model(videoCapture, params)
         self.params=params
     def update(self, frame ):
         """
@@ -109,11 +110,9 @@ class Model:
                 the ViBe algorithm to determine which pixels are foreground
                 using the samples.
         """
-        self.foreGround = processFrame( 
+        self.foreGround = processChannel(
             frame,
-            self.foreGroundChannels,
-            self.samplesArray,
-            self.foreGround,
+            self.samples,
             self.params
         )
 
@@ -134,7 +133,7 @@ def TwoVariableIterator(h, w, sr=0,sc=0):
         for c in range(sc, w):
             yield (r,c)
 
-def init_model(firstSample, params ):
+def init_model(videoCapture, params ):
     """
     Description:
         Initializes the memory for the algorithm such as the sample space.
@@ -142,25 +141,35 @@ def init_model(firstSample, params ):
     Args:
         params (Params): the params control how the algorithm works.
     """
-    h, w, channelCount = firstSample.shape
-    singleChannelSize = h, w
-    channels = cv2.split(firstSample)
-    foreGroundChannels=[]
-    channelSamples=[]
-    foreGround=np.zeros(singleChannelSize, dtype=NP_ELEMENT_TYPE)
-    for ch in range(0, channelCount):
-        chMat = np.zeros(singleChannelSize, dtype=NP_ELEMENT_TYPE)
-        foreGroundChannels.append(chMat)
 
-        # Initialize the samples to the background.
-        # Allow the samples to vary a little bit.
-        samples = []
-        for n in range(0, params.maxHistory ):
-            variance=np.random.random_integers(0,20)-10
-            samples.append(np.copy(channels[ch])+variance)
+    # Initialize the samples to the background.
+    # Allow the samples to vary a little bit.
+    samples = []
+    avg = averageFrames(videoCapture, params.initFrames )
+    for n in range(0, params.maxHistory ):
+        samples.append(np.copy(avg))
 
-        channelSamples.append(samples)
-    return foreGroundChannels, channelSamples, foreGround
+    w = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    channels = 3#XXX
+
+    ndSize = h, w, channels
+    foreGround=np.zeros(ndSize, dtype=NP_ELEMENT_TYPE)
+
+    return foreGround, samples
+
+def averageFrames( videoCapture, numberOfFrames ):
+    ret, frame = videoCapture.read()
+    h, w, channels = frame.shape
+    avg=np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
+    # Sum
+    for n in range(1, numberOfFrames ):
+        for (r, c ) in TwoVariableIterator( h, w ):
+            avg[r,c]=avg[r,c]+frame[r,c]
+    # Divide
+    for (r, c ) in TwoVariableIterator( h, w ):
+        avg[r,c]=avg[r,c]/numberOfFrames
+    return avg
 
 def processChannel( frameChannel, samples, params ):
     """
@@ -250,39 +259,3 @@ def IsPixelPartOfBackground(samples, r,c, frameValue, noMin, maxHistory, R ):
                 return True
         index = index + 1
     return False
-
-def processFrame( frame, foreGroundChannels, channelSamples, foreGround, params ):
-    """
-    Description:
-        Breaks the frames into channels and processes each one.
-
-    Args:
-        frame (ndarray (shape = (h, w, chCount) )): A video or picture frame.
-        [out] foreGroundChannels (list): the results from the ViBe algorithm
-            are saved.
-        channelSamples (list): the 3D cube of samples for each channel.
-        [out] foreGround (ndarray (shape = (h, w, 1) )): the new foreground is
-            saved.
-        params (Params): the params control how the algorithm works.
-
-    Returns:
-        ndarray (shape=(h,w,1)): Returns the new foreground for the current
-            channel.
-    """
-    h, w, channelCount = frame.shape
-    channels = cv2.split(frame)
-    # Process each channel and combine the results into the foreground.
-    for ch in range(0, channelCount):
-        # Process the current channel.
-        newfgCh=processChannel(channels[ch], channelSamples[ch],params )
-        # Replace the old foreground.
-        if ( ch == 0 ):
-            foreGround=newfgCh
-        # Combine the rest of foreground results.
-        else:
-            foreGround=cv2.bitwise_or(foreGround,newfgCh)
-        # Save results for this channel in case we need them later.
-        foreGroundChannels[ch]=newfgCh
-    if(channelCount==1):
-        return foreGroundChannels[0];
-    return foreGround

@@ -91,7 +91,7 @@ def main():
 
     # Initialize and time the method.
     startTime=time.time()
-    model = vibe.Model(frame)
+    model = vibe.Model(cap)
     endTime=time.time()
 
     # Display time results.
