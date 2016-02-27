@@ -115,6 +115,8 @@ def main():
         while not k == 27:
             # Grab next frame.
             ret, frame = cap.read()
+            if not ret:
+                break
 
             # Run ViBe on the current frame to update the model.
             frameStartTime=time.time()
@@ -137,9 +139,9 @@ def main():
             #combined = model.foreGround
             channel = np.zeros((height,width,1), np.uint8)
             combined = cv2.merge((
-                cv2.bitwise_or(channel, model.foreGround ),
-                cv2.bitwise_or(channel, model.foreGround ),
-                cv2.bitwise_or(channel, model.foreGround )
+                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround))),
+                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround))),
+                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround)))
             ))
 
             # Show the results and write it to the file buffer.

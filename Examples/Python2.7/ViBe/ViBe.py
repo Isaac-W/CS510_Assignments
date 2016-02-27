@@ -75,7 +75,7 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 3):
+    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20):
         """
         Description:
             Stores params.
@@ -113,6 +113,10 @@ class Model:
                 the ViBe algorithm to determine which pixels are foreground
                 using the samples.
         """
+
+        #Downsample to increase speed
+        frame = cv2.pyrDown(cv2.pyrDown(frame))
+
         processFrame(
             frame,
             self.samples,
@@ -154,8 +158,17 @@ def init_model(videoCapture, params ):
     for n in range(0, params.maxHistory ):
         samples.append(np.copy(avg))
 
-    w = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    ret, frame = videoCapture.read()
+
+    #Downsample to increaes speed
+    frame = cv2.pyrDown(cv2.pyrDown(frame))
+
+    h, w, channels = frame.shape
+
+
+    #w = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    #h = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
     channels = 3#XXX
 
     ndSize = h, w, 1
@@ -165,6 +178,10 @@ def init_model(videoCapture, params ):
 
 def averageFrames( videoCapture, numberOfFrames ):
     ret, frame = videoCapture.read()
+
+    #Downsample to increaes speed
+    frame = cv2.pyrDown(cv2.pyrDown(frame))
+
     h, w, channels = frame.shape
     avg = np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
     # Sum
@@ -175,6 +192,8 @@ def averageFrames( videoCapture, numberOfFrames ):
             avg[r,c] = avg[r,c]+(frame[r,c]/numberOfFrames)
             #print avg[r, c]
         ret, frame = videoCapture.read()
+        #Downsample to increaes speed
+        frame = cv2.pyrDown(cv2.pyrDown(frame))
     return avg
 
 def processFrame( frame, samples, foreGroundChannel, params ):
@@ -190,6 +209,7 @@ def processFrame( frame, samples, foreGroundChannel, params ):
         foreGroundChannel: The foreground mask
         params (Params): the params control how the algorithm works.
     """
+
     h, w, ch = frame.shape
     # This step below actually speeds python up.
     # Turns out that accessing the properties of an object slow it down.
