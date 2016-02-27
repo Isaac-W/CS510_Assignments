@@ -75,7 +75,8 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20):
+    # def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20): #For color images
+    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20): #For black and white images
         """
         Description:
             Stores params.
@@ -103,6 +104,7 @@ class Model:
         """
         self.foreGround, self.samples = init_model(videoCapture, params)
         self.params=params
+
     def update(self, frame ):
         """
         Description:
@@ -114,8 +116,8 @@ class Model:
                 using the samples.
         """
 
-        #Downsample to increase speed
-        frame = cv2.pyrDown(cv2.pyrDown(frame))
+        #Preprocess the frame
+        frame = preprocess_frame(frame)
 
         processFrame(
             frame,
@@ -123,6 +125,12 @@ class Model:
             self.foreGround,
             self.params
         )
+
+def preprocess_frame(frame):
+        frame = cv2.pyrDown(frame)
+        # frame = cv2.pyrDown(cv2.pyrDown(frame))
+        # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
+        return frame
 
 def TwoVariableIterator(h, w, sr=0,sc=0):
     """
@@ -160,10 +168,12 @@ def init_model(videoCapture, params ):
 
     ret, frame = videoCapture.read()
 
-    #Downsample to increaes speed
-    frame = cv2.pyrDown(cv2.pyrDown(frame))
+    #Preprocess the frame
+    frame = preprocess_frame(frame)
+
 
     h, w, channels = frame.shape
+    # h, w = frame.shape
 
 
     #w = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -179,10 +189,11 @@ def init_model(videoCapture, params ):
 def averageFrames( videoCapture, numberOfFrames ):
     ret, frame = videoCapture.read()
 
-    #Downsample to increaes speed
-    frame = cv2.pyrDown(cv2.pyrDown(frame))
+    #Preprocess the frame
+    frame = preprocess_frame(frame)
 
     h, w, channels = frame.shape
+    # h, w = frame.shape
     avg = np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
     # Sum
     for n in range(0, numberOfFrames):
@@ -192,8 +203,8 @@ def averageFrames( videoCapture, numberOfFrames ):
             avg[r,c] = avg[r,c]+(frame[r,c]/numberOfFrames)
             #print avg[r, c]
         ret, frame = videoCapture.read()
-        #Downsample to increaes speed
-        frame = cv2.pyrDown(cv2.pyrDown(frame))
+        #Preprocess the frame
+        frame = preprocess_frame(frame)
     return avg
 
 def processFrame( frame, samples, foreGroundChannel, params ):
@@ -211,6 +222,7 @@ def processFrame( frame, samples, foreGroundChannel, params ):
     """
 
     h, w, ch = frame.shape
+    # h, w = frame.shape
     # This step below actually speeds python up.
     # Turns out that accessing the properties of an object slow it down.
     maxHistory=params.maxHistory
@@ -274,6 +286,8 @@ def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
         # Find a measure of the similarity.
         #print (channelSamples[index])[r, c]
         #print frame.shape
+        if(False):
+            pass
         if(frame.shape[2] == 3): #If frame has 3 channels (RGB or Lab)
             #print (channelSamples[index])[r, c]
             Rs = int((channelSamples[index])[r, c, 0])

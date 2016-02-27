@@ -139,9 +139,9 @@ def main():
             #combined = model.foreGround
             channel = np.zeros((height,width,1), np.uint8)
             combined = cv2.merge((
-                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround))),
-                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround))),
-                cv2.bitwise_or(channel, cv2.pyrUp(cv2.pyrUp(model.foreGround)))
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround))
             ))
 
             # Show the results and write it to the file buffer.
