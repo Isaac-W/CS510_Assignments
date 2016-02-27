@@ -75,7 +75,7 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 2):
+    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 3):
         """
         Description:
             Stores params.
@@ -113,9 +113,10 @@ class Model:
                 the ViBe algorithm to determine which pixels are foreground
                 using the samples.
         """
-        self.foreGround = processFrame(
+        processFrame(
             frame,
             self.samples,
+            self.foreGround,
             self.params
         )
 
@@ -149,6 +150,7 @@ def init_model(videoCapture, params ):
     # Allow the samples to vary a little bit.
     samples = []
     avg = averageFrames(videoCapture, params.initFrames )
+    cv2.imshow('average frame', avg)
     for n in range(0, params.maxHistory ):
         samples.append(np.copy(avg))
 
@@ -164,18 +166,18 @@ def init_model(videoCapture, params ):
 def averageFrames( videoCapture, numberOfFrames ):
     ret, frame = videoCapture.read()
     h, w, channels = frame.shape
-    avg=np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
+    avg = np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
     # Sum
-    for n in range(1, numberOfFrames ):
-        for (r, c ) in TwoVariableIterator( h, w ):
-            avg[r,c]=avg[r,c]+frame[r,c]
+    for n in range(0, numberOfFrames):
+        #cv2.imshow('average frame', frame)
+        for (r, c) in TwoVariableIterator(h, w):
+            #print avg[r, c]
+            avg[r,c] = avg[r,c]+(frame[r,c]/numberOfFrames)
+            #print avg[r, c]
         ret, frame = videoCapture.read()
-    # Divide
-    for (r, c ) in TwoVariableIterator( h, w ):
-        avg[r,c]=avg[r,c]/numberOfFrames
     return avg
 
-def processFrame( frame, samples, params ):
+def processFrame( frame, samples, foreGroundChannel, params ):
     """
     Description:
         Process the frame by checking for the bg pixels and updating them
@@ -185,10 +187,10 @@ def processFrame( frame, samples, params ):
             current frame for one pixel.
         samples (list): A list samples. Each element is a 2D array of pixels.
             So this param is kind of like a 3D cube.
+        foreGroundChannel: The foreground mask
         params (Params): the params control how the algorithm works.
     """
     h, w, ch = frame.shape
-    newForeGroundChannel = np.zeros((h, w), dtype=NP_ELEMENT_TYPE)
     # This step below actually speeds python up.
     # Turns out that accessing the properties of an object slow it down.
     maxHistory=params.maxHistory
@@ -200,16 +202,12 @@ def processFrame( frame, samples, params ):
     for (r,c) in TwoVariableIterator(h-1,w-1,1,1):
         # Force the current pixel into an 32-bit.
         # Python has trouble with the subtraction other wise.
-        #frameChannelValue=int((frameChannel[r,c]))
-        #startTime=time.time()
-        isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frame, noMin, maxHistory, R )
-        #endTime=time.time()
-        #totalTime=endTime-startTime
-        #print "Updating model time: %g" % totalTime
+        isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frame, noMin, maxHistory, R)
+        #print isPixelPartOfBackground
         # Plant seeds for pixels that are part of the background.
         if ( isPixelPartOfBackground ):
             # Set this pixel as part of the bg.
-            newForeGroundChannel[r,c]=PIXEL_MARKER_BACKGROUND
+            foreGroundChannel[r,c]=PIXEL_MARKER_BACKGROUND
             # Detect slow changes in the background
             phi = 16
             rand = np.random.random_integers(0,phi-1) #Updating bg with 1/16 probability
@@ -223,9 +221,7 @@ def processFrame( frame, samples, params ):
                 (samples[rndSample])[nr+r,nc+c]=(frame[r,c])
         # Set this pixel as part of the fg.
         else:
-            newForeGroundChannel[r,c]=PIXEL_MARKER_FOREGROUND
-    # Display time results.
-    return newForeGroundChannel
+            foreGroundChannel[r,c]=PIXEL_MARKER_FOREGROUND
 
 def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
     """
@@ -266,19 +262,15 @@ def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
             R = int(frame[r, c, 0])
             G = int(frame[r, c, 1])
             B = int(frame[r, c, 2])
-            #print (Rs - R)
+            #print Rs, R, Gs, G, Bs, B
             RR = abs(Rs - R)*abs(Rs - R)
             GG = abs(Gs - G)*abs(Gs - G)
             BB = abs(Bs - B)*abs(Bs - B)
-            #T = RR + BB + GG
-            #print T
-            #print Rs, Gs, Bs, R, G, B
-            #print np.sqrt((Rs - R)*(Rs - R) + (Gs - G)*(Gs - G) + (Bs - B)*(Bs - B))
             dist = np.sqrt(RR + GG + BB)
-            #dist = abs(Rs - R) + abs(Gs - G) + abs(Bs - B)
+            #print dist
+
         else: #Frame has only one channel
             dist = abs(channelSamples[index][r, c] - frame[r, c])
-
         # Count similar pixels.
         if (dist <= R ):
             count = count + 1
