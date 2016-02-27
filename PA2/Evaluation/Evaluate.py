@@ -141,6 +141,9 @@ def CalcPWC(tp, fp, tn, fn):
 def main():
     if len(sys.argv) < MIN_ARGS + 1:
         print 'usage: %s <ground truth> <input video> [-s|-n]' % sys.argv[0]
+        print '-----------------------------------------------'
+        print 'flags: -s -- silent; run without console output'
+        print '       -n -- no csv output; console stats only'
         return
 
     truth_path = sys.argv[1]
