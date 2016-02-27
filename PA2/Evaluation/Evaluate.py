@@ -10,11 +10,15 @@ import time
 
 MIN_ARGS = 2
 
+PIXEL_MAX = 255
+
 PX_STATIC = 0
 PX_SHADOW = 50
 PX_OUTSIDE = 85
 PX_UNKNOWN = 170
 PX_MOTION = 255
+
+PX_LABELS = [PX_STATIC, PX_SHADOW, PX_OUTSIDE, PX_UNKNOWN, PX_MOTION]
 
 # END CONSTANTS
 
@@ -68,16 +72,38 @@ def TwoVariableIterator(h, w, sr=0,sc=0):
             yield (r,c)
 
 
+def GetClosestPixelValue(pixel):
+    """
+    Finds the closest label and returns it. Fixup for ground truth pixel values.
+
+    :param pixel: The grayscale value for a pixel
+    :return: The label (PX_STATIC, etc.) for the pixel
+    """
+
+    closest = PIXEL_MAX
+    out_label = PX_STATIC
+
+    for label in PX_LABELS:
+        diff = abs(pixel - label)
+        if diff < closest:
+            closest = diff
+            out_label = label
+
+    return out_label
+
+
 def IsForeground(truth_pixel):
     """
-    Checks if a pixel is considered foreground in the ground truth video
-    :param truth_pixel:
-    :return:
+    Checks if a pixel is considered foreground in the ground truth video.
+
+    :param truth_pixel: The grayscale value for a pixel
+    :return: True if is foreground, False if is background
     """
+
     if truth_pixel == PX_STATIC:
         return False
     elif truth_pixel == PX_SHADOW:
-        return True
+        return False
     elif truth_pixel == PX_OUTSIDE:
         return False
     elif truth_pixel == PX_UNKNOWN:
@@ -180,36 +206,33 @@ def main():
         if truth_frame is None or input_frame is None:
             break
 
-        #truth_frame = cv2.cvtColor(truth_frame, cv2.COLOR_RGB2GRAY)
-        #input_frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2GRAY)
-
         frame_tp = 0
         frame_tn = 0
         frame_fp = 0
         frame_fn = 0
 
-        for (y, x) in TwoVariableIterator(height, width, 0, 0):
-            #truth_px = truth_frame[y, x]
-            #input_px = input_frame[y, x]
+        for (y, x) in TwoVariableIterator(height, width):
+            # Assume grayscale; then all channels have the same value (use R channel only)
+            truth_px = truth_frame.item(y, x, 0)    # array.item is faster than array[]
+            input_px = input_frame.item(y, x, 0)
 
-            # Assume grayscale; then all channels have the same value
-            truth_px = truth_frame[y, x, 0]
-            input_px = input_frame[y, x, 0]
+            # Fixup truth pixel
+            truth_px = GetClosestPixelValue(truth_px)
 
             if IsForeground(truth_px):
-                if input_px == 0:
-                    # BG (True: FG)
-                    frame_fn += 1
-                else:
+                if input_px:
                     # FG (True: FG)
                     frame_tp += 1
-            else:
-                if input_px == 0:
-                    # BG (True: BG)
-                    frame_tn += 1
                 else:
+                    # BG (True: FG)
+                    frame_fn += 1
+            else:
+                if input_px:
                     # FG (True: BG)
                     frame_fp += 1
+                else:
+                    # BG (True: BG)
+                    frame_tn += 1
 
         # Calculate per-frame metrics
         frame_p = CalcP(frame_tp, frame_fp)
