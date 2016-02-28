@@ -162,7 +162,8 @@ def init_model(videoCapture, params):
     # Foreground buffer is one-channel: foreground/background
     foreGround = np.zeros((h, w, 1), dtype=NP_ELEMENT_TYPE)
 
-    ret, avg = get_frame(videoCapture)  #averageFrames(videoCapture, params.initFrames, (h, w, channels))
+    #ret, avg = get_frame(videoCapture)
+    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
     cv2.imshow('average frame', avg)
 
     # Create the array of previous samples
@@ -176,17 +177,21 @@ def init_model(videoCapture, params):
 
 
 def averageFrames(videoCapture, numberOfFrames, ndSize):
-    avg = np.zeros(ndSize, dtype=NP_ELEMENT_TYPE)
+    total = np.zeros(ndSize, dtype=np.uint32)
     h, w, channels = ndSize
 
     for n in range(numberOfFrames):
         ret, frame = get_frame(videoCapture)
 
         for (r, c) in TwoVariableIterator(h, w):
-            # Compute running average
-            avg[r, c] = avg[r, c] + (frame[r, c] / numberOfFrames)
+            # Compute totals
+            total[r, c] += frame[r, c]
 
-    return avg
+    awesome_avg = np.true_divide(total, numberOfFrames)
+    awesome_avg = np.round(awesome_avg)
+    awesome_avg = awesome_avg.astype(np.uint8)
+
+    return awesome_avg
 
 
 def sampleFromSelf(frame, numberOfSamples):
