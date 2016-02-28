@@ -38,26 +38,28 @@ import time
 # BEGIN MODULE CONSTANTS
 
 # Declare vector constants for cardinal compass directions.
-NW=(-1,-1)
-N=(0,-1)
-NE=(1,-1)
-W=(-1,0)
-E=(1,0)
-SW=(-1,1)
-S=(0,1)
-SE=(1,1)
+NW = (-1, -1)
+N = (0, -1)
+NE = (1, -1)
+W = (-1, 0)
+E = (1, 0)
+SW = (-1, 1)
+S = (0, 1)
+SE = (1, 1)
 
 # Put compass directions into an easily accessible array.
 EightCardinalDirections = [NW, N, NE, W, E, SW, S, SE]
 
 # The constants determine how the fg and bg will be marked.
-PIXEL_MARKER_FOREGROUND=255
-PIXEL_MARKER_BACKGROUND=0
+PIXEL_MARKER_FOREGROUND = 255
+PIXEL_MARKER_BACKGROUND = 0
 
 # The data type for pixel arrays in memory.
 NP_ELEMENT_TYPE = np.uint8
 
+
 # END MODULE CONSTANTS
+
 
 class Params:
     """
@@ -75,8 +77,9 @@ class Params:
             example, 20 means that pixels can have a difference of 20 for one of
             their channels such as the red channel.
     """
+
     # def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20): #For color images
-    def __init__(self, maxHistory = 20, noMin = 2, R = 20, initFrames = 20): #For black and white images
+    def __init__(self, maxHistory=20, noMin=2, R=20, initFrames=20):  # For black and white images
         """
         Description:
             Stores params.
@@ -86,13 +89,15 @@ class Params:
         self.R = R
         self.initFrames = initFrames
 
+
 class Model:
     """
     Description:
         Holds the information ViBe will use such as the current foreground
         pixels and the sample space.
     """
-    def __init__(self, videoCapture, params = Params()):
+
+    def __init__(self, videoCapture, params=Params()):
         """
         Description:
             Initializes the model.
@@ -103,9 +108,9 @@ class Model:
             params (Params): the params control how the algorithm works.
         """
         self.foreGround, self.samples = init_model(videoCapture, params)
-        self.params=params
+        self.params = params
 
-    def update(self, frame ):
+    def update(self, frame):
         """
         Description:
             Updates ViBe's information using the current frame.
@@ -116,9 +121,6 @@ class Model:
                 using the samples.
         """
 
-        #Preprocess the frame
-        frame = preprocess_frame(frame)
-
         processFrame(
             frame,
             self.samples,
@@ -126,13 +128,8 @@ class Model:
             self.params
         )
 
-def preprocess_frame(frame):
-        frame = cv2.pyrDown(frame)
-        # frame = cv2.pyrDown(cv2.pyrDown(frame))
-        # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
-        return frame
 
-def TwoVariableIterator(h, w, sr=0,sc=0):
+def TwoVariableIterator(h, w, sr=0, sc=0):
     """
     Description:
         Provides an easy way to iterate through a 2D space.
@@ -147,9 +144,10 @@ def TwoVariableIterator(h, w, sr=0,sc=0):
     """
     for r in range(sr, h):
         for c in range(sc, w):
-            yield (r,c)
+            yield (r, c)
 
-def init_model(videoCapture, params ):
+
+def init_model(videoCapture, params):
     """
     Description:
         Initializes the memory for the algorithm such as the sample space.
@@ -158,56 +156,43 @@ def init_model(videoCapture, params ):
         params (Params): the params control how the algorithm works.
     """
 
-    # Initialize the samples to the background.
-    # Allow the samples to vary a little bit.
-    samples = []
-    avg = averageFrames(videoCapture, params.initFrames )
+    h, w, channels = get_frame_shape(videoCapture)
+
+    # Make foreground buffer
+    # Foreground buffer is one-channel: foreground/background
+    foreGround = np.zeros((h, w, 1), dtype=NP_ELEMENT_TYPE)
+
+    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
     cv2.imshow('average frame', avg)
-    for n in range(0, params.maxHistory ):
+
+    # TODO Do vibe neighbor sampling (right now is just copying the average)
+
+    # Create the array of previous samples
+    # Initialize the samples to the background.
+    samples = []
+
+    for n in range(0, params.maxHistory):
         samples.append(np.copy(avg))
-
-    ret, frame = videoCapture.read()
-
-    #Preprocess the frame
-    frame = preprocess_frame(frame)
-
-
-    h, w, channels = frame.shape
-    # h, w = frame.shape
-
-
-    #w = int(videoCapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    #h = int(videoCapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    channels = 3#XXX
-
-    ndSize = h, w, 1
-    foreGround=np.zeros(ndSize, dtype=NP_ELEMENT_TYPE)
 
     return foreGround, samples
 
-def averageFrames( videoCapture, numberOfFrames ):
-    ret, frame = videoCapture.read()
 
-    #Preprocess the frame
-    frame = preprocess_frame(frame)
+def averageFrames(videoCapture, numberOfFrames, ndSize):
+    avg = np.zeros(ndSize, dtype=NP_ELEMENT_TYPE)
+    h, w, channels = ndSize
 
-    h, w, channels = frame.shape
-    # h, w = frame.shape
-    avg = np.zeros(frame.shape, dtype=NP_ELEMENT_TYPE)
-    # Sum
-    for n in range(0, numberOfFrames):
-        #cv2.imshow('average frame', frame)
+    for n in range(numberOfFrames):
+        ret, frame = get_frame(videoCapture)
+        test = frame.shape
+
         for (r, c) in TwoVariableIterator(h, w):
-            #print avg[r, c]
-            avg[r,c] = avg[r,c]+(frame[r,c]/numberOfFrames)
-            #print avg[r, c]
-        ret, frame = videoCapture.read()
-        #Preprocess the frame
-        frame = preprocess_frame(frame)
+            # Compute running average
+            avg[r, c] = avg[r, c] + (frame[r, c] / numberOfFrames)
+
     return avg
 
-def processFrame( frame, samples, foreGroundChannel, params ):
+
+def processFrame(frame, samples, foreGroundChannel, params):
     """
     Description:
         Process the frame by checking for the bg pixels and updating them
@@ -222,40 +207,41 @@ def processFrame( frame, samples, foreGroundChannel, params ):
     """
 
     h, w, ch = frame.shape
-    # h, w = frame.shape
+
     # This step below actually speeds python up.
     # Turns out that accessing the properties of an object slow it down.
-    maxHistory=params.maxHistory
-    R=params.R
-    noMin=params.noMin
+    maxHistory = params.maxHistory
+    R = params.R
+    noMin = params.noMin
     # Check each pixel to see if it belongs with the background
     # Leave a border of 1 unit thick.
 
-    for (r,c) in TwoVariableIterator(h-1,w-1,1,1):
+    for (r, c) in TwoVariableIterator(h - 1, w - 1, 1, 1):
         # Force the current pixel into an 32-bit.
         # Python has trouble with the subtraction other wise.
         isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frame, noMin, maxHistory, R)
-        #print isPixelPartOfBackground
+        # print isPixelPartOfBackground
         # Plant seeds for pixels that are part of the background.
-        if ( isPixelPartOfBackground ):
+        if isPixelPartOfBackground:
             # Set this pixel as part of the bg.
-            foreGroundChannel[r,c]=PIXEL_MARKER_BACKGROUND
+            foreGroundChannel[r, c] = PIXEL_MARKER_BACKGROUND
             # Detect slow changes in the background
             phi = 16
-            rand = np.random.random_integers(0,phi-1) #Updating bg with 1/16 probability
-            if (rand==0):
-                rndSample=np.random.random_integers(0,maxHistory-1)
-                (samples[rndSample])[r,c]=(frame[r,c])
+            rand = np.random.random_integers(0, phi - 1)  # Updating bg with 1/16 probability
+            if (rand == 0):
+                rndSample = np.random.random_integers(0, maxHistory - 1)
+                (samples[rndSample])[r, c] = (frame[r, c])
                 # Allow ghosts to disappear by planting seeds in nearby pixels.
-                rndSample=np.random.random_integers(0,maxHistory-1)
-                rndD=np.random.random_integers(0,7)
-                nc,nr = EightCardinalDirections[rndD]
-                (samples[rndSample])[nr+r,nc+c]=(frame[r,c])
+                rndSample = np.random.random_integers(0, maxHistory - 1)
+                rndD = np.random.random_integers(0, 7)
+                nc, nr = EightCardinalDirections[rndD]
+                (samples[rndSample])[nr + r, nc + c] = (frame[r, c])
         # Set this pixel as part of the fg.
         else:
-            foreGroundChannel[r,c]=PIXEL_MARKER_FOREGROUND
+            foreGroundChannel[r, c] = PIXEL_MARKER_FOREGROUND
 
-def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
+
+def IsPixelPartOfBackground(channelSamples, r, c, frame, noMin, maxHistory, R):
     """
     Description:
         Determines if the pixel should be part of the background by looking for
@@ -279,38 +265,75 @@ def IsPixelPartOfBackground(channelSamples, r,c, frame, noMin, maxHistory, R ):
     Returns:
         True if the pixel is background, False if foreground
     """
-    count=0
-    index=0
+    count = 0  # Number of samples that are within the radius
+
     # Go through the samples.
-    while (index<maxHistory):
+    for index in range(maxHistory):
         # Find a measure of the similarity.
-        #print (channelSamples[index])[r, c]
-        #print frame.shape
-        if(False):
-            pass
-        if(frame.shape[2] == 3): #If frame has 3 channels (RGB or Lab)
-            #print (channelSamples[index])[r, c]
+        # print (channelSamples[index])[r, c]
+        # print frame.shape
+
+        # Find euclidean distance (for 3 channel and 1 channel video)
+        if frame.shape[2] == 3:  # If frame has 3 channels (RGB or Lab)
+            # print (channelSamples[index])[r, c]
+
             Rs = int((channelSamples[index])[r, c, 0])
             Gs = int((channelSamples[index])[r, c, 1])
             Bs = int((channelSamples[index])[r, c, 2])
+
             R = int(frame[r, c, 0])
             G = int(frame[r, c, 1])
             B = int(frame[r, c, 2])
-            #print Rs, R, Gs, G, Bs, B
-            RR = abs(Rs - R)*abs(Rs - R)
-            GG = abs(Gs - G)*abs(Gs - G)
-            BB = abs(Bs - B)*abs(Bs - B)
-            dist = np.sqrt(RR + GG + BB)
-            #print dist
 
-        else: #Frame has only one channel
+            # print Rs, R, Gs, G, Bs, B
+
+            RR = abs(Rs - R) * abs(Rs - R)
+            GG = abs(Gs - G) * abs(Gs - G)
+            BB = abs(Bs - B) * abs(Bs - B)
+
+            dist = np.sqrt(RR + GG + BB)
+        else:  # Frame has only one channel
             dist = abs(channelSamples[index][r, c] - frame[r, c])
+
         # Count similar pixels.
-        if (dist <= R ):
-            count = count + 1
+        if dist <= R:
+            count += 1
+
             # The pixel is part of the background
             # if we have reached the threshold.
-            if (count >= noMin):
+            if count >= noMin:
                 return True
-        index = index + 1
+
     return False
+
+
+def get_frame(cap):
+    ret, frame = cap.read()
+    frame = preprocess_frame(frame)
+    return ret, frame
+
+
+def preprocess_frame(frame):
+    # Downsample frame
+    frame = cv2.pyrDown(frame)
+    # frame = cv2.pyrDown(cv2.pyrDown(frame))
+    # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
+    return frame
+
+
+def postprocess_frame(frame):
+    return frame
+
+
+def get_frame_shape(cap):
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+    # Downsample frame size (for pyrDown)
+    h = (h + 1) / 2
+    w = (w + 1) / 2
+
+    # 3 channels for RGB
+    channels = 3
+
+    return h, w, channels
