@@ -21,6 +21,7 @@ import time
 import os
 import numpy as np
 
+
 def createVideoWriter(output_file, codec, fps, width, height):
     """
     Description:
@@ -51,8 +52,10 @@ def createVideoWriter(output_file, codec, fps, width, height):
         except:
             return None
 
+
 # Minimum args required.
 MIN_ARGS = 1
+
 
 def main():
     # Display error if the program needs more args
@@ -61,7 +64,7 @@ def main():
         return
 
     # Grab the argument.
-    source_path=sys.argv[1]
+    source_path = sys.argv[1]
 
     # Open the video.
     cap = cv2.VideoCapture(source_path)
@@ -79,67 +82,65 @@ def main():
     codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
     # Create an a video writer so that the resuls can be saved.
-    writer = cv2.VideoWriter("outVibe.avi", codec, fps, (width, height))
+    output_path = sourceName + '_outvibe' + file_extension
+    writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
     if not writer:
-        print 'Error--Could not write to magnitude video:', outputPaths[0]
+        print 'Error--Could not write to magnitude video:', output_path
         return
 
-    # Get the first frame and display it.
-    #ret, frame = cap.read()
-    ret, frame = cap.read()
-    cv2.imshow('image', frame)
-    k = cv2.waitKey(100)
-
-    # Initialize and time the method.
-    startTime=time.time()
+    # Initialize initial ViBE background model
+    startTime = time.time()
     model = vibe.Model(cap)
-    endTime=time.time()
+    endTime = time.time()
 
     # Display time results.
-    totalTime=endTime-startTime
+    totalTime = endTime - startTime
     print "init time: %g" % totalTime
 
     # Calculate and display megapixels.
-    h, w, channelCount = frame.shape
-    megapixels = h*w/1000000.0
+    megapixels = height * width / 1000000.0
     print "megapixels: %g" % megapixels
 
     # Protect against an error, so the video can be saved regardless.
     try:
         # Keep track of the last input key, the frames, and time.
-        k=0
+        k = 0
         frames = 0
-        startTime=time.time()
+        startTime = time.time()
 
+        # Main frame processing loop
         # Loop until the user presses escape.
         while not k == 27:
             # Grab next frame.
-            ret, frame = cap.read()
+            ret, frame = vibe.get_frame(cap)
+            if not ret:
+                break
 
             # Run ViBe on the current frame to update the model.
-            frameStartTime=time.time()
+            frameStartTime = time.time()
             model.update(frame)
-            frameEndTime=time.time()
+            frameEndTime = time.time()
 
             # Display statistics.
             print "Frame:", frames
             frames = frames + 1
-            endTime=time.time()
-            totalTime=endTime-startTime
-            print "seconds this frame: %f" % (frameEndTime-frameStartTime)
-            timeForEachFrame=totalTime/frames
+            endTime = time.time()
+            totalTime = endTime - startTime
+            print "seconds this frame: %f" % (frameEndTime - frameStartTime)
+            timeForEachFrame = totalTime / frames
             print "average seconds for each frame: %f" % timeForEachFrame
-            print "average megapixels a second: %f" % (megapixels/timeForEachFrame)
+            print "average megapixels a second: %f" % (megapixels / timeForEachFrame)
 
             # Overlay the current frame with the results.
-            #channels = cv2.split(frame)
-            #blank_image = numpy.zeros((height, width), numpy.uint8)
-            #combined = model.foreGround
-            channel = np.zeros((height,width,1), np.uint8)
+            # channels = cv2.split(frame)
+            # blank_image = numpy.zeros((height, width), numpy.uint8)
+            # combined = model.foreGround
+
+            channel = np.zeros((height, width, 1), np.uint8)
             combined = cv2.merge((
-                cv2.bitwise_or(channel, model.foreGround ),
-                cv2.bitwise_or(channel, model.foreGround ),
-                cv2.bitwise_or(channel, model.foreGround )
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
+                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround))
             ))
 
             # Show the results and write it to the file buffer.
@@ -154,6 +155,7 @@ def main():
         print "Writing video to file."
         writer.release()
         cap.release()
+
 
 # Run main if this was the main module.
 if __name__ == '__main__':
