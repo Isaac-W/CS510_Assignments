@@ -165,14 +165,12 @@ def init_model(videoCapture, params):
     avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
     cv2.imshow('average frame', avg)
 
-    # TODO Do vibe neighbor sampling (right now is just copying the average)
-
     # Create the array of previous samples
-    # Initialize the samples to the background.
-    samples = []
+    # Initialize the samples to the neighborhood
+    samples = sampleFromNeighborhood(avg, params.maxHistory)
 
-    for n in range(0, params.maxHistory):
-        samples.append(np.copy(avg))
+    # Initialize the samples to the background.
+    # samples = sampleFromSelf(avg, params.maxHistory)
 
     return foreGround, samples
 
@@ -183,13 +181,54 @@ def averageFrames(videoCapture, numberOfFrames, ndSize):
 
     for n in range(numberOfFrames):
         ret, frame = get_frame(videoCapture)
-        test = frame.shape
 
         for (r, c) in TwoVariableIterator(h, w):
             # Compute running average
             avg[r, c] = avg[r, c] + (frame[r, c] / numberOfFrames)
 
     return avg
+
+
+def sampleFromSelf(frame, numberOfSamples):
+    samples = []
+
+    for n in range(numberOfSamples):
+        samples.append(np.copy(frame))
+
+    return samples
+
+
+def sampleFromNeighborhood(frame, numberOfSamples):
+    samples = []
+    h, w, channels = frame.shape
+
+    for n in range(numberOfSamples):
+        curSample = np.zeros((h, w, channels), dtype=NP_ELEMENT_TYPE)
+
+        # Process each pixel
+        for (r, c) in TwoVariableIterator(h, w):
+            neighbor = np.random.random_integers(0, len(EightCardinalDirections) + 1)
+
+            # Get coordinates of sample
+            if neighbor >= len(EightCardinalDirections):
+                # Sample from self
+                x, y = c, r
+            else:
+                # Calculate pixel position of zgiven neighbor
+                nc, nr = EightCardinalDirections[neighbor]
+                x, y = (c + nc), (r + nr)
+
+            # Avoid going out of bounds (TODO: Can wraparound if desired)
+            x = min(max(x, 0), w - 1)
+            y = min(max(y, 0), h - 1)
+
+            curSample[r, c] = frame[y, x]
+
+        # Add the sample to the list of samples
+        samples.append(curSample)
+
+
+    return samples
 
 
 def processFrame(frame, samples, foreGroundChannel, params):
@@ -221,23 +260,28 @@ def processFrame(frame, samples, foreGroundChannel, params):
         # Python has trouble with the subtraction other wise.
         isPixelPartOfBackground = IsPixelPartOfBackground(samples, r, c, frame, noMin, maxHistory, R)
         # print isPixelPartOfBackground
+
         # Plant seeds for pixels that are part of the background.
         if isPixelPartOfBackground:
             # Set this pixel as part of the bg.
             foreGroundChannel[r, c] = PIXEL_MARKER_BACKGROUND
+
             # Detect slow changes in the background
             phi = 16
             rand = np.random.random_integers(0, phi - 1)  # Updating bg with 1/16 probability
-            if (rand == 0):
+
+            if rand == 0:
                 rndSample = np.random.random_integers(0, maxHistory - 1)
                 (samples[rndSample])[r, c] = (frame[r, c])
+
                 # Allow ghosts to disappear by planting seeds in nearby pixels.
                 rndSample = np.random.random_integers(0, maxHistory - 1)
                 rndD = np.random.random_integers(0, 7)
                 nc, nr = EightCardinalDirections[rndD]
+
                 (samples[rndSample])[nr + r, nc + c] = (frame[r, c])
-        # Set this pixel as part of the fg.
         else:
+            # Set this pixel as part of the fg.
             foreGroundChannel[r, c] = PIXEL_MARKER_FOREGROUND
 
 
