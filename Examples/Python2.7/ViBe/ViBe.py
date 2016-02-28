@@ -353,7 +353,7 @@ def IsPixelPartOfBackground(channelSamples, r, c, frame, noMin, maxHistory, R):
 
 def get_frame(cap):
     ret, frame = cap.read()
-    if ret and frame:
+    if ret and frame is not None:
         frame = preprocess_frame(frame)
     return ret, frame
 
