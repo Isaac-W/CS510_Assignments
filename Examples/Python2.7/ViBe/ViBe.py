@@ -162,7 +162,7 @@ def init_model(videoCapture, params):
     # Foreground buffer is one-channel: foreground/background
     foreGround = np.zeros((h, w, 1), dtype=NP_ELEMENT_TYPE)
 
-    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
+    ret, avg = get_frame(videoCapture)  #averageFrames(videoCapture, params.initFrames, (h, w, channels))
     cv2.imshow('average frame', avg)
 
     # Create the array of previous samples
@@ -353,7 +353,8 @@ def IsPixelPartOfBackground(channelSamples, r, c, frame, noMin, maxHistory, R):
 
 def get_frame(cap):
     ret, frame = cap.read()
-    frame = preprocess_frame(frame)
+    if ret and frame:
+        frame = preprocess_frame(frame)
     return ret, frame
 
 
