@@ -333,7 +333,7 @@ def main():
 
     # Fast forward past <params.startFrame> frames.
     if not programParams.no_out:
-        print "Skipping %d frames." % programParams.startFrame - 1
+        print "Skipping %d frames." % (programParams.startFrame - 1)
     for i in range( 0, programParams.startFrame - 1 ):
         truth_ret = 1 # Set to non null in case not in eval mode.
         if programParams.doEval:
