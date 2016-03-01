@@ -330,15 +330,15 @@ def IsPixelPartOfBackground(channelSamples, r, c, frame, noMin, maxHistory, R):
             Gs = int((channelSamples[index])[r, c, 1])
             Bs = int((channelSamples[index])[r, c, 2])
 
-            R = int(frame[r, c, 0])
-            G = int(frame[r, c, 1])
-            B = int(frame[r, c, 2])
+            Rf = int(frame[r, c, 0])
+            Gf = int(frame[r, c, 1])
+            Bf = int(frame[r, c, 2])
 
             # print Rs, R, Gs, G, Bs, B
 
-            RR = abs(Rs - R) * abs(Rs - R)
-            GG = abs(Gs - G) * abs(Gs - G)
-            BB = abs(Bs - B) * abs(Bs - B)
+            RR = abs(Rs - Rf) * abs(Rs - Rf)
+            GG = abs(Gs - Gf) * abs(Gs - Gf)
+            BB = abs(Bs - Bf) * abs(Bs - Bf)
 
             dist = np.sqrt(RR + GG + BB)
         else:  # Frame has only one channel
