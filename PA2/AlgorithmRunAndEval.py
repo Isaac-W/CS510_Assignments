@@ -24,13 +24,15 @@ import Evaluate as e
 # Minimum args required.
 MIN_ARGS = 1
 
-def processFrame( model, writer, frame, height, width ):
+def processFrame( model, writer, frame, height, width, params ):
     # Run ViBe on the current frame to update the model.
     frameStartTime = time.time()
     model.update(frame)
     frameEndTime = time.time()
     
-    print "seconds for ViBe processing: %f" % (frameEndTime - frameStartTime)
+    if not params.no_out:
+        print "seconds for ViBe processing: %f" % (
+            frameEndTime - frameStartTime)
 
     # Overlay the current frame with the results.
     # channels = cv2.split(frame)
@@ -71,7 +73,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
     # Calculate and display megapixels.
     megapixels = height * width / 1000000.0
-    print "megapixels: %g" % megapixels
+    if not params.no_out:
+        print "megapixels: %g" % megapixels
     
     # Truth and input must have same width/height, and have same number of frames!
     width = int(input_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -82,7 +85,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
     videoStats = e.TruthComparisonStats()
     
     if params.doEval:
-        print "Synchronizing ground truth with input..."
+        if not params.no_out:
+            print "Synchronizing ground truth with input..."
         numberOfFramesTheInputIsAheadBy = int(
             input_cap.get(cv2.CAP_PROP_POS_FRAMES)
             - truth_cap.get(cv2.CAP_PROP_POS_FRAMES)
@@ -103,7 +107,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
     
     
     # Fast forward past <params.startFrame> frames.
-    print "Skipping %d frames." % params.startFrame
+    if not params.no_out:
+        print "Skipping %d frames." % params.startFrame
     for i in range( 0, params.startFrame ):
         truth_ret = 1 # Set to non null in case not in eval mode.
         if params.doEval:
@@ -132,17 +137,19 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
             if params.showInput:
                 cv2.imshow('Input', input_frame)
-            if params.showTruth and programParams.doEval:
+            if params.showTruth and params.doEval:
                 cv2.imshow('truth_frame', truth_frame )
             
             frame_number += 1
             processedFrames += 1
-            print "Frame:", frame_number
+            
+            if not params.no_out:
+                print "Frame:", frame_number
             
             input_frame = vibe.preprocess_frame(input_frame)
             
             toShow, toFile = processFrame( 
-                model, writer, input_frame, height, width )
+                model, writer, input_frame, height, width, params )
             # Skip the frame if does not contain evaluation.
             if not hasReachedFirstEvalFrame:
                 hasReachedFirstEvalFrame = (
@@ -177,10 +184,12 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             # Display statistics.
             endTime = time.time()
             totalTime = endTime - startTime
-            timeForEachFrame = totalTime / frame_number
-            print "average seconds for each frame: %f" % timeForEachFrame
-            print "average megapixels a second: %f" % (megapixels / 
-                timeForEachFrame)
+            timeForEachFrame = totalTime / processedFrames
+            
+            if not params.no_out:
+                print "average seconds for each frame: %f" % timeForEachFrame
+                print "average megapixels a second: %f" % (megapixels / 
+                    timeForEachFrame)
 
             # Show the results and write it to the file buffer.
             cv2.imshow('Processing Results', toShow)
@@ -222,7 +231,6 @@ def assertHasArgumentIndex( index, argName, expectedArgName ):
             
             
 def readArgs( params ):
-    global no_out, no_csv, doEval, startFrame
     i = MIN_ARGS + 1
     while i < len(sys.argv):
         currentArg = sys.argv[i]
@@ -264,8 +272,10 @@ def showUsage():
     print '       -n -- no csv output.'
     print '       -Sd -- show diff frame.'
     print '       -St -- show truth frame.'
-
+no_output=False
+    
 def main():
+    global no_output
     if len(sys.argv) < MIN_ARGS + 1:
         showUsage()
         return
@@ -281,6 +291,7 @@ def main():
         showUsage()
         return 1
 
+    no_output = programParams.no_out
     # Open the videos
     truth_cap = None
     if programParams.doEval:
@@ -322,37 +333,43 @@ def main():
             return
 
     # Initialize initial ViBE background model
-    print "Performing initialization..."
+    if not programParams.no_out:
+        print "Performing initialization..."
     startTime = time.time()
     model = vibe.Model(input_cap)
     endTime = time.time()
 
     # Display time results.
     totalTime = endTime - startTime
-    print "init time: %g" % totalTime
+    if not programParams.no_out:
+        print "init time: %g" % totalTime
 
     frame_number, processedFrames, evalFrames, videoStats = \
         processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, programParams, 
             model, writer, diffWriter, height, width )
 
     # Calculate frame averages
-    if programParams.doEval:
+    if programParams.doEval and evalFrames > 0:
         results = e.calculateResults( evalFrames, videoStats )
 
     # Output totals and averages
-    if not programParams.no_out and programParams.doEval:
+    if not programParams.no_out and programParams.doEval and evalFrames > 0:
         e.printSummary( evalFrames, results )
 
     # Write video stats
-    if not programParams.no_csv and programParams.doEval:
+    if not programParams.no_csv and programParams.doEval and evalFrames > 0:
         e.writeSummaryToCSV( csv_writer, evalFrames, results )
 
     # Cleanup
     if csv_file:
         csv_file.close()
     if diffWriter:
+        if not programParams.no_out:
+            print "Saving difference video."
         diffWriter.release()
     if writer:
+        if not programParams.no_out:
+            print "Saving results video."
         writer.release()
 
 # Run main if this was the main module.
@@ -360,4 +377,5 @@ if __name__ == '__main__':
     from timeit import Timer
     t = Timer(lambda: main())
     time = t.timeit(number=1)
-    print "Running time: ", time
+    if not no_output:
+        print "Running time: ", time
