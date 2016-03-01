@@ -48,6 +48,24 @@ def processFrame( model, writer, frame, height, width ):
     
     return combined, combined
 
+def npArrayFlatten( npArray ):
+    if len(npArray.shape) == 3:
+        npArray = np.average(npArray, axis=2)
+    return npArray
+    
+def npArrayUniform( npArray ):
+    return int(np.var(npArrayFlatten(npArray))) == 0
+
+def isTruthFrameSkippable( truth_frame ):
+    flattenedImage = npArrayFlatten(truth_frame)
+    mean = np.mean(flattenedImage)
+    found = False
+    for label in e.PX_LABELS:
+        if label == mean:
+            found = True
+            break
+    return npArrayUniform(flattenedImage) and not found
+
 def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
         model, writer, diffWriter, height, width ):
 
@@ -101,6 +119,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
         processedFrames = 0
         evalFrames = 0
         startTime = time.time()
+        hasReachedFirstEvalFrame = False
         
         while not k == 27:
             truth_frame = 1 # Set to non null in case not in eval mode.
@@ -124,8 +143,13 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             
             toShow, toFile = processFrame( 
                 model, writer, input_frame, height, width )
+            # Skip the frame if does not contain evaluation.
+            if not hasReachedFirstEvalFrame:
+                hasReachedFirstEvalFrame = (
+                    not isTruthFrameSkippable(truth_frame)
+                )
 
-            if params.doEval:
+            if params.doEval and hasReachedFirstEvalFrame:
                 evalFrames += 1
                 truthComparisonStats, diffFrame = \
                     e.CalculateFrameStats( height, width, truth_frame, toFile,
