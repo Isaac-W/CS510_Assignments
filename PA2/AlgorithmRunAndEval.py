@@ -63,6 +63,27 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
     frame_number = 0
     videoStats = e.TruthComparisonStats()
     
+    if params.doEval:
+        print "Synchronizing ground truth with input..."
+        numberOfFramesTheInputIsAheadBy = int(
+            input_cap.get(cv2.CAP_PROP_POS_FRAMES)
+            - truth_cap.get(cv2.CAP_PROP_POS_FRAMES)
+        )
+        # Fast forward the ground truth if necessary.
+        for i in range( 0, numberOfFramesTheInputIsAheadBy ):
+            truth_ret = truth_cap.grab()
+
+            if not truth_ret:
+                raise Exception( "Ground truth does not have enough frames." )
+        numberOfFramesTheTruthIsAheadBy = -1*numberOfFramesTheInputIsAheadBy
+        # Fast forward the input if necessary.
+        for i in range( 0, numberOfFramesTheTruthIsAheadBy ):
+            input_ret = input_cap.grab()
+
+            if not input_ret:
+                raise Exception( "Input truth does not have enough frames." )
+    
+    
     # Fast forward past <params.startFrame> frames.
     print "Skipping %d frames." % params.startFrame
     for i in range( 0, params.startFrame ):
@@ -73,8 +94,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
         if not truth_ret or not input_ret:
             raise Exception( "Start time past the end of videos." )
-        frame_number += 1
-
+    frame_number = input_cap.get(cv2.CAP_PROP_POS_FRAMES)
     try:
         # Keep track of the last input key, the frames, and time.
         k = 0
@@ -278,6 +298,7 @@ def main():
             return
 
     # Initialize initial ViBE background model
+    print "Performing initialization..."
     startTime = time.time()
     model = vibe.Model(input_cap)
     endTime = time.time()
