@@ -214,12 +214,12 @@ def showUsage():
     print 'flags:'
     print '       -e <ground truth video> -- evaluate the results. Turn on evaluation mode.'
     print '       -s -- silent; run without console output.'
-    print '       -t <startFrame> -- start running after <startFrame> frames.'
     print '       -Si -- show input frames.'
-    print '       -St -- show truth frame.'
+    print '       -t <startFrame> -- start running after <startFrame> frames.'
     print 'EVALUATION MODE:'
     print '       -n -- no csv output.'
     print '       -Sd -- show diff frame.'
+    print '       -St -- show truth frame.'
 
 def main():
     if len(sys.argv) < MIN_ARGS + 1:

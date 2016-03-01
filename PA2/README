@@ -1,0 +1,30 @@
+CS 510 PA2
+
+Group Members:
+
+Ben Fraj
+Joshua Gillham
+Kaden Strand
+Isaac Wang
+
+python version : 2.7 
+opencv version : 3.1
+requires numpy python module
+
+Usage: python AlgorithmRunAndEval.py <input video> [flags..]
+
+Argument descriptions:
+   -e <ground truth video> -- evaluate the results. Turn on evaluation mode.
+   -s -- silent; run without console output.
+   -Si -- show input frames.
+   -t <startFrame> -- start running after <startFrame> frames.
+EVALUATION MODE:
+   -n -- no csv output.
+   -Sd -- show diff frame.
+   -St -- show truth frame.
+
+Argument Notes:
+
+The -e argument must be given for any of the evaluation mode arguments to have
+an effect. Regardless, evaluation mode arguments may still be given and no error
+will be generated.
