@@ -176,6 +176,7 @@ class TruthComparisonStats:
         self.tn = 0
         self.fp = 0
         self.fn = 0
+        self.marker = [0,0,0]
     def accumulate( self, otherTruthComparisonStats ):
         self.tp = self.tp + otherTruthComparisonStats.tp
         self.tn = self.tn + otherTruthComparisonStats.tn
@@ -212,30 +213,39 @@ def ComparePixels( truth_px, input_px):
         else:
             # BG (True: FG)
             truthComparisonStats.fn += 1
+            truthComparisonStats.marker = [192, 192, 0]
     # The ground truth value is part of the background.
     else:
         # Our results report a positive even though they should not.
         if input_px:
             # FG (True: BG)
             truthComparisonStats.fp += 1
+            truthComparisonStats.marker = [0, 0, 192]
         # Our results agree with the ground truth.
         else:
             # BG (True: BG)
             truthComparisonStats.tn += 1
     return truthComparisonStats
 
-def CalculateFrameStats( h, w, truth_frame, input_frame ):
+def CalculateFrameStats( h, w, truth_frame, input_frame, showDiff ):
 
     results = TruthComparisonStats()
+    diffFrame = None
+    if showDiff:
+        diffFrame = np.zeros(
+            (input_frame.shape[0], input_frame.shape[1], 3), dtype=np.uint8)
 
     for (y, x) in TwoVariableIterator(h, w):
         # Assume grayscale; then all channels have the same value (use R channel only)
         truth_px = truth_frame.item(y, x, 0)    # array.item is faster than array[]
         input_px = input_frame.item(y, x, 0)
 
-        results.accumulate( ComparePixels( truth_px, input_px ) )
+        pixelResult = ComparePixels( truth_px, input_px )
+        results.accumulate( pixelResult )
+        if showDiff:
+            diffFrame[y, x] = pixelResult.marker
 
-    return results
+    return results,diffFrame
 
 def analyzeVideo( truth_cap, input_cap, csv_writer, no_out, no_csv ):
     # Truth and input must have same width/height, and have same number of frames!

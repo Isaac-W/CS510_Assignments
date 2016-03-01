@@ -49,7 +49,7 @@ def processFrame( model, writer, frame, height, width ):
     return combined, combined
 
 def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
-        model, writer, height, width ):
+        model, writer, diffWriter, height, width ):
 
     # Calculate and display megapixels.
     megapixels = height * width / 1000000.0
@@ -85,7 +85,10 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             if truth_frame is None or input_frame is None:
                 break
 
-            cv2.imshow('image22', input_frame)
+            if params.showInput:
+                cv2.imshow('Input', input_frame)
+            if params.showTruth:
+                cv2.imshow('truth_frame', truth_frame )
             
             frame_number += 1
             print "Frame:", frame_number
@@ -96,9 +99,14 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
                 model, writer, input_frame, height, width )
 
             if params.doEval:
-                truthComparisonStats = \
-                    e.CalculateFrameStats( height, width, truth_frame, toFile )
+                truthComparisonStats, diffFrame = \
+                    e.CalculateFrameStats( height, width, truth_frame, toFile,
+                        params.showDiff )
                 metaStats = e.TruthMetaComparisonStats( truthComparisonStats )
+                
+                if params.showDiff:
+                    diffWriter.write( diffFrame )
+                    cv2.imshow('diffFrame', diffFrame )
 
                 # Output running stats
                 if not params.no_out:
@@ -139,6 +147,9 @@ class Params:
         self.no_out = False
         self.no_csv = False
         self.doEval = False
+        self.showDiff = False
+        self.showTruth = False
+        self.showInput = False
         self.startFrame = 0
         self.truth_path = truth_path
         self.input_path = input_path
@@ -154,6 +165,12 @@ def readArgs( params ):
             params.no_out = True
         elif currentArg == '-n':
             params.no_csv = True
+        elif currentArg == '-Si':
+            params.showInput = True
+        elif currentArg == '-Sd':
+            params.showDiff = True
+        elif currentArg == '-St':
+            params.showTruth = True
         elif currentArg == '-t':
             i = i + 1
             params.startFrame = int(sys.argv[i])
@@ -161,14 +178,18 @@ def readArgs( params ):
 
 def main():
     if len(sys.argv) < MIN_ARGS + 1:
-        print ( 'usage: %s <ground truth> <input video> [-e] [-s|-n] ' + \
+        print ( 'usage: %s <ground truth> <input video> [flags..] ' + \
             '[-t <startFrame> ]') % sys.argv[0]
         print '-----------------------------------------------'
         print 'flags:'
-        print '       -e -- evaluate the results.'
-        print '       -n -- no csv output; console stats only.'
+        print '       -e -- evaluate the results. Turn on evaluation mode.'
         print '       -s -- silent; run without console output.'
         print '       -t <startFrame> -- start running after <startFrame> frames.'
+        print '       -Si -- show input frames.'
+        print '       -St -- show truth frame.'
+        print 'EVALUATION MODE:'
+        print '       -n -- no csv output.'
+        print '       -Sd -- show diff frame.'
         return
 
     programParams = Params(truth_path = sys.argv[1], input_path = sys.argv[2] )
@@ -186,7 +207,7 @@ def main():
     csv_writer = None
 
     # Create CSV writer
-    if not programParams.no_csv:
+    if not programParams.no_csv and programParams.doEval:
         csv_path, extension = os.path.splitext(programParams.input_path)
         csv_writer = e.createCSVWriter( csv_path )
 
@@ -203,8 +224,17 @@ def main():
     output_path = sourceName + '_outvibe' + file_extension
     writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
     if not writer:
-        print 'Error--Could not write to magnitude video:', output_path
+        print 'Error--Could not write to out video:', output_path
         return
+
+    diffWriter = None
+    if programParams.doEval and programParams.showDiff:
+        # Create an a video writer so that the resuls can be saved.
+        output_path = sourceName + '_diff' + file_extension
+        diffWriter = cv2.VideoWriter(output_path, codec, fps, (width, height))
+        if not writer:
+            print 'Error--Could not write to diff video:', output_path
+            return
 
     # Initialize initial ViBE background model
     startTime = time.time()
@@ -217,7 +247,7 @@ def main():
 
     frame_number, videoStats = \
         processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, programParams, 
-            model, writer, height, width )
+            model, writer, diffWriter, height, width )
 
     # Calculate frame averages
     if programParams.doEval:
@@ -234,6 +264,10 @@ def main():
     # Cleanup
     if csv_file:
         csv_file.close()
+    if diffWriter:
+        diffWriter.release()
+    if writer:
+        writer.release()
 
 # Run main if this was the main module.
 if __name__ == '__main__':

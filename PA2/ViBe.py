@@ -164,7 +164,6 @@ def init_model(videoCapture, params):
 
     #ret, avg = get_frame(videoCapture)
     avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
-    cv2.imshow('average frame', avg)
 
     # Create the array of previous samples
     # Initialize the samples to the neighborhood
