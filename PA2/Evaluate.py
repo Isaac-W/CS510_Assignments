@@ -311,7 +311,7 @@ def createCSVWriter( csv_path ):
 
 def calculateResults( frameCount, videoStats ):
     videoAverages = copy.deepcopy(videoStats)
-    videoAverages.average(frameCount)
+    videoAverages.average( max( frameCount, 1 ) )
 
     metaStatsAverages = TruthMetaComparisonStats( videoAverages )
     metaVideoStats = TruthMetaComparisonStats( videoStats )

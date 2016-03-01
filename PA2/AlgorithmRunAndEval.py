@@ -104,19 +104,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
             if not input_ret:
                 raise Exception( "Input truth does not have enough frames." )
-    
-    
-    # Fast forward past <params.startFrame> frames.
-    if not params.no_out:
-        print "Skipping %d frames." % params.startFrame
-    for i in range( 0, params.startFrame ):
-        truth_ret = 1 # Set to non null in case not in eval mode.
-        if params.doEval:
-            truth_ret = truth_cap.grab()
-        input_ret = input_cap.grab()
 
-        if not truth_ret or not input_ret:
-            raise Exception( "Start time past the end of videos." )
     frame_number = input_cap.get(cv2.CAP_PROP_POS_FRAMES)
     try:
         # Keep track of the last input key, the frames, and time.
@@ -126,7 +114,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
         startTime = time.time()
         hasReachedFirstEvalFrame = False
         
-        while not k == 27:
+        while not k == 27 and frame_number <= params.stopFrame:
             truth_frame = 1 # Set to non null in case not in eval mode.
             if params.doEval:
                 truth_ret, truth_frame = truth_cap.read()
@@ -139,9 +127,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
                 cv2.imshow('Input', input_frame)
             if params.showTruth and params.doEval:
                 cv2.imshow('truth_frame', truth_frame )
-            
-            frame_number += 1
-            processedFrames += 1
+            k = cv2.waitKey(20)
             
             if not params.no_out:
                 print "Frame:", frame_number
@@ -150,6 +136,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             
             toShow, toFile = processFrame( 
                 model, writer, input_frame, height, width, params )
+            processedFrames += 1
+            
             # Skip the frame if does not contain evaluation.
             if not hasReachedFirstEvalFrame:
                 hasReachedFirstEvalFrame = (
@@ -169,13 +157,13 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
                 # Output running stats
                 if not params.no_out:
-                    truthComparisonStats.printOut( "Frame", evalFrames)
-                    metaStats.printOut( "     ", evalFrames)
+                    truthComparisonStats.printOut( "Frame", frame_number)
+                    metaStats.printOut( "     ", frame_number)
 
                 # Write running stats
                 if not params.no_csv:
                     frameStats = e.FrameStats(truthComparisonStats, metaStats)
-                    csvArray = frameStats.GetCSVArray( "Frame", evalFrames )
+                    csvArray = frameStats.GetCSVArray( "Frame", frame_number )
                     csv_writer.writerow( csvArray )
 
                 # Update totals
@@ -197,6 +185,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             
             # Grab the key pressed.
             k = cv2.waitKey(100)
+            
+            frame_number += 1
 
     except KeyboardInterrupt:
         pass
@@ -214,6 +204,7 @@ class Params:
         self.startFrame = 0
         self.input_path = input_path
         self.truth_path = None
+        self.stopFrame = sys.maxint
 
 class BadArgumentsException(Exception):
     pass
@@ -258,6 +249,14 @@ def readArgs( params ):
             except ValueError:
                 raise BadArgumentsException(
                     "Expected int for argument '%s'" % '-t'  )
+        elif currentArg == '-E':
+            i = i + 1
+            assertHasArgumentIndex( i, '-E', "<stopFrame>")
+            try:
+                params.stopFrame = int(sys.argv[i])
+            except ValueError:
+                raise BadArgumentsException(
+                    "Expected int for argument '%s'" % '-E'  )
         i = i + 1
 def showUsage():
     print ( 'usage: %s <input video> [flags..] ' + \
@@ -331,6 +330,18 @@ def main():
         if not writer:
             print 'Error--Could not write to diff video:', output_path
             return
+
+    # Fast forward past <params.startFrame> frames.
+    if not programParams.no_out:
+        print "Skipping %d frames." % programParams.startFrame - 1
+    for i in range( 0, programParams.startFrame - 1 ):
+        truth_ret = 1 # Set to non null in case not in eval mode.
+        if programParams.doEval:
+            truth_ret = truth_cap.grab()
+        input_ret = input_cap.grab()
+
+        if not truth_ret or not input_ret:
+            raise Exception( "Start time past the end of videos." )
 
     # Initialize initial ViBE background model
     if not programParams.no_out:
