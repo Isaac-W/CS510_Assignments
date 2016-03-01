@@ -22,7 +22,7 @@ import numpy as np
 import Evaluate as e
 
 # Minimum args required.
-MIN_ARGS = 2
+MIN_ARGS = 1
 
 def processFrame( model, writer, frame, height, width ):
     # Run ViBe on the current frame to update the model.
@@ -56,8 +56,8 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
     print "megapixels: %g" % megapixels
     
     # Truth and input must have same width/height, and have same number of frames!
-    width = int(truth_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(truth_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(input_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(input_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Init running totals
     frame_number = 0
@@ -66,20 +66,26 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
     # Fast forward past <params.startFrame> frames.
     print "Skipping %d frames." % params.startFrame
     for i in range( 0, params.startFrame ):
-        truth_ret = truth_cap.grab()
+        truth_ret = 1 # Set to non null in case not in eval mode.
+        if params.doEval:
+            truth_ret = truth_cap.grab()
         input_ret = input_cap.grab()
 
         if not truth_ret or not input_ret:
             raise Exception( "Start time past the end of videos." )
+        frame_number += 1
 
     try:
         # Keep track of the last input key, the frames, and time.
         k = 0
-        frames = 0
+        processedFrames = 0
+        evalFrames = 0
         startTime = time.time()
         
         while not k == 27:
-            truth_ret, truth_frame = truth_cap.read()
+            truth_frame = 1 # Set to non null in case not in eval mode.
+            if params.doEval:
+                truth_ret, truth_frame = truth_cap.read()
             input_ret, input_frame = input_cap.read()
 
             if truth_frame is None or input_frame is None:
@@ -87,10 +93,11 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
             if params.showInput:
                 cv2.imshow('Input', input_frame)
-            if params.showTruth:
+            if params.showTruth and programParams.doEval:
                 cv2.imshow('truth_frame', truth_frame )
             
             frame_number += 1
+            processedFrames += 1
             print "Frame:", frame_number
             
             input_frame = vibe.preprocess_frame(input_frame)
@@ -99,6 +106,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
                 model, writer, input_frame, height, width )
 
             if params.doEval:
+                evalFrames += 1
                 truthComparisonStats, diffFrame = \
                     e.CalculateFrameStats( height, width, truth_frame, toFile,
                         params.showDiff )
@@ -110,13 +118,13 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
                 # Output running stats
                 if not params.no_out:
-                    truthComparisonStats.printOut( "Frame", frame_number)
-                    metaStats.printOut( "     ", frame_number)
+                    truthComparisonStats.printOut( "Frame", evalFrames)
+                    metaStats.printOut( "     ", evalFrames)
 
                 # Write running stats
                 if not params.no_csv:
                     frameStats = e.FrameStats(truthComparisonStats, metaStats)
-                    csvArray = frameStats.GetCSVArray( "Frame", frame_number )
+                    csvArray = frameStats.GetCSVArray( "Frame", evalFrames )
                     csv_writer.writerow( csvArray )
 
                 # Update totals
@@ -131,7 +139,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
                 timeForEachFrame)
 
             # Show the results and write it to the file buffer.
-            cv2.imshow('image', toShow)
+            cv2.imshow('Processing Results', toShow)
             writer.write(toFile)
             
             # Grab the key pressed.
@@ -139,11 +147,11 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
 
     except KeyboardInterrupt:
         pass
-    return frame_number, videoStats
+    return frame_number, processedFrames, evalFrames, videoStats
 
 
 class Params:
-    def __init__(self, truth_path, input_path):
+    def __init__(self, input_path):
         self.no_out = False
         self.no_csv = False
         self.doEval = False
@@ -151,15 +159,34 @@ class Params:
         self.showTruth = False
         self.showInput = False
         self.startFrame = 0
-        self.truth_path = truth_path
         self.input_path = input_path
+        self.truth_path = None
 
+class BadArgumentsException(Exception):
+    pass
+    
+def assertFileExists( filePath ):
+    if not os.path.isfile(filePath):
+        raise BadArgumentsException( 
+            "'%s' does not exist or does not specify a file." % filePath )
+
+def assertHasArgumentIndex( index, argName, expectedArgName ):
+    if index >= len(sys.argv):
+        raise BadArgumentsException( 
+            "Expected %s for argument '%s'" % (expectedArgName,argName) )
+
+            
+            
 def readArgs( params ):
     global no_out, no_csv, doEval, startFrame
     i = MIN_ARGS + 1
     while i < len(sys.argv):
         currentArg = sys.argv[i]
         if currentArg == '-e':
+            i = i + 1
+            assertHasArgumentIndex( i, '-e', "<ground truth path>")
+            params.truth_path = sys.argv[i]
+            assertFileExists( params.truth_path )
             params.doEval = True
         elif currentArg == '-s':
             params.no_out = True
@@ -173,34 +200,47 @@ def readArgs( params ):
             params.showTruth = True
         elif currentArg == '-t':
             i = i + 1
-            params.startFrame = int(sys.argv[i])
+            assertHasArgumentIndex( i, '-t', "<startFrame>")
+            try:
+                params.startFrame = int(sys.argv[i])
+            except ValueError:
+                raise BadArgumentsException(
+                    "Expected int for argument '%s'" % '-t'  )
         i = i + 1
+def showUsage():
+    print ( 'usage: %s <input video> [flags..] ' + \
+        '[-t <startFrame> ]') % sys.argv[0]
+    print '-----------------------------------------------'
+    print 'flags:'
+    print '       -e <ground truth video> -- evaluate the results. Turn on evaluation mode.'
+    print '       -s -- silent; run without console output.'
+    print '       -t <startFrame> -- start running after <startFrame> frames.'
+    print '       -Si -- show input frames.'
+    print '       -St -- show truth frame.'
+    print 'EVALUATION MODE:'
+    print '       -n -- no csv output.'
+    print '       -Sd -- show diff frame.'
 
 def main():
     if len(sys.argv) < MIN_ARGS + 1:
-        print ( 'usage: %s <ground truth> <input video> [flags..] ' + \
-            '[-t <startFrame> ]') % sys.argv[0]
-        print '-----------------------------------------------'
-        print 'flags:'
-        print '       -e -- evaluate the results. Turn on evaluation mode.'
-        print '       -s -- silent; run without console output.'
-        print '       -t <startFrame> -- start running after <startFrame> frames.'
-        print '       -Si -- show input frames.'
-        print '       -St -- show truth frame.'
-        print 'EVALUATION MODE:'
-        print '       -n -- no csv output.'
-        print '       -Sd -- show diff frame.'
+        showUsage()
         return
 
-    programParams = Params(truth_path = sys.argv[1], input_path = sys.argv[2] )
+    programParams = Params(input_path = sys.argv[1] )
 
-    # Split the extension of the source video.
-    sourceName, file_extension = os.path.splitext(programParams.input_path)
-    
-    readArgs( programParams )
+    # Read and validate arguments
+    try:
+        assertFileExists( programParams.input_path )
+        readArgs( programParams )
+    except BadArgumentsException, err:
+        print str(err)
+        showUsage()
+        return 1
 
     # Open the videos
-    truth_cap = cv2.VideoCapture(programParams.truth_path)
+    truth_cap = None
+    if programParams.doEval:
+        truth_cap = cv2.VideoCapture(programParams.truth_path)
     input_cap = cv2.VideoCapture(programParams.input_path)
 
     csv_file = None
@@ -221,6 +261,7 @@ def main():
     codec = int(input_cap.get(cv2.CAP_PROP_FOURCC))
 
     # Create an a video writer so that the resuls can be saved.
+    sourceName, file_extension = os.path.splitext(programParams.input_path)
     output_path = sourceName + '_outvibe' + file_extension
     writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
     if not writer:
@@ -245,21 +286,21 @@ def main():
     totalTime = endTime - startTime
     print "init time: %g" % totalTime
 
-    frame_number, videoStats = \
+    frame_number, processedFrames, evalFrames, videoStats = \
         processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, programParams, 
             model, writer, diffWriter, height, width )
 
     # Calculate frame averages
     if programParams.doEval:
-        results = e.calculateResults( frame_number, videoStats )
+        results = e.calculateResults( evalFrames, videoStats )
 
     # Output totals and averages
     if not programParams.no_out and programParams.doEval:
-        e.printSummary( frame_number, results )
+        e.printSummary( evalFrames, results )
 
     # Write video stats
     if not programParams.no_csv and programParams.doEval:
-        e.writeSummaryToCSV( csv_writer, frame_number, results )
+        e.writeSummaryToCSV( csv_writer, evalFrames, results )
 
     # Cleanup
     if csv_file:
@@ -273,4 +314,5 @@ def main():
 if __name__ == '__main__':
     from timeit import Timer
     t = Timer(lambda: main())
-    print "Running time: ", t.timeit(number=1)
+    time = t.timeit(number=1)
+    print "Running time: ", time
