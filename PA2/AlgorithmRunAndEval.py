@@ -38,10 +38,7 @@ def processFrame( model, writer, frame, height, width ):
     # combined = model.foreGround
 
     channel = np.zeros((height, width, 1), np.uint8)
-    print model.foreGround.shape
     fullSized = cv2.pyrUp(model.foreGround)
-    print fullSized.shape
-    print channel.shape
     resultOneChannel = cv2.bitwise_or(channel, fullSized)
     combined = cv2.merge((
         resultOneChannel,
