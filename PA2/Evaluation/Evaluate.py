@@ -8,7 +8,7 @@ import time
 
 # BEGIN CONSTANTS
 
-MIN_ARGS = 2
+MIN_ARGS = 3
 
 PIXEL_MAX = 255
 
@@ -140,7 +140,7 @@ def CalcPWC(tp, fp, tn, fn):
 
 def main():
     if len(sys.argv) < MIN_ARGS + 1:
-        print 'usage: %s <ground truth> <input video> [-s|-n]' % sys.argv[0]
+        print 'usage: %s <ground truth> <input video> <start_frame> [-s|-n]' % sys.argv[0]
         print '-----------------------------------------------'
         print 'flags: -s -- silent; run without console output'
         print '       -n -- no csv output; console stats only'
@@ -149,12 +149,14 @@ def main():
     truth_path = sys.argv[1]
     input_path = sys.argv[2]
 
+    start_frame = int(sys.argv[3])
+
     # Check flags
     no_out = False
     no_csv = False
 
     if len(sys.argv) > MIN_ARGS + 1:
-        flag = sys.argv[3].lower()
+        flag = sys.argv[4].lower()
         if flag == '-s':
             no_out = True
         elif flag == '-n':
@@ -189,9 +191,21 @@ def main():
             print 'Error opening csv file (%s) for writing! ' % (csv_path + '.csv')
             return
 
-    # Init running totals
+    # Create difference output
+    codec = int(input_cap.get(cv2.CAP_PROP_FOURCC))
+    fps = int(input_cap.get(cv2.CAP_PROP_FPS))
+
+    diff_path, extension = os.path.splitext(input_path)
+    diff_writer = cv2.VideoWriter(diff_path + '_diff' + extension, codec, fps, (width, height))
+
+    # Skip until start frame in truth video
     frame_number = 0
 
+    for frame in range(start_frame):
+        truth_ret, truth_frame = truth_cap.read()
+        frame_number += 1
+
+    # Init running totals
     total_tp = 0
     total_fp = 0
     total_tn = 0
@@ -209,6 +223,11 @@ def main():
         if truth_frame is None or input_frame is None:
             break
 
+        # Show frames
+        cv2.imshow('Ground Truth', truth_frame)
+        cv2.imshow('Input Video', input_frame)
+        cv2.waitKey(30)
+
         frame_tp = 0
         frame_tn = 0
         frame_fp = 0
@@ -223,19 +242,33 @@ def main():
             truth_px = GetClosestPixelValue(truth_px)
 
             if IsForeground(truth_px):
-                if input_px:
+                if input_px > 127:
                     # FG (True: FG)
                     frame_tp += 1
                 else:
                     # BG (True: FG)
                     frame_fn += 1
+
+                    # Flag false negatives as light blue
+                    input_frame.itemset((y, x, 0), 192)
+                    input_frame.itemset((y, x, 1), 192)
+                    input_frame.itemset((y, x, 2), 0)
             else:
-                if input_px:
+                if input_px > 127:
                     # FG (True: BG)
                     frame_fp += 1
+
+                    # Flag false positives as red
+                    input_frame.itemset((y, x, 0), 0)
+                    input_frame.itemset((y, x, 1), 0)
+                    input_frame.itemset((y, x, 2), 192)
                 else:
                     # BG (True: BG)
                     frame_tn += 1
+
+        # Output difference
+        cv2.imshow('Difference', input_frame)
+        diff_writer.write(input_frame)
 
         # Calculate per-frame metrics
         frame_p = CalcP(frame_tp, frame_fp)
@@ -323,6 +356,9 @@ def main():
     # Cleanup
     if csv_file:
         csv_file.close()
+
+    if diff_writer:
+        diff_writer.release()
 
 
 if __name__ == '__main__':
