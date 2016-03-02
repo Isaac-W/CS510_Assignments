@@ -112,6 +112,11 @@ def IsForeground(truth_pixel):
 
     return False
 
+
+def IsInputForeground(input_pixel):
+    return input_pixel > 127
+
+
 # precision
 def CalcP(tp, fp):
     if tp == 0:
@@ -202,22 +207,12 @@ def ComparePixels( truth_px, input_px):
     # Fixup truth pixel
     truth_px = GetClosestPixelValue(truth_px)
 
-    # The ground truth values are encoded.
-    # Determine if this ground truth pixel represents the foreground.
-    if IsForeground(truth_px):
-        # Our results agree with the ground truth.
-        if input_px:
-            # FG (True: FG)
-            truthComparisonStats.tp += 1
-        # Our results report negative even though they should not.
-        else:
-            # BG (True: FG)
-            truthComparisonStats.fn += 1
-            truthComparisonStats.marker = [192, 192, 0]
-    # The ground truth value is part of the background.
-    else:
+    # Analyze based on ground truth label
+    if truth_px == PX_STATIC:
+        # Consider the ground truth background
+
         # Our results report a positive even though they should not.
-        if input_px:
+        if IsInputForeground(input_px):
             # FG (True: BG)
             truthComparisonStats.fp += 1
             truthComparisonStats.marker = [0, 0, 192]
@@ -225,6 +220,22 @@ def ComparePixels( truth_px, input_px):
         else:
             # BG (True: BG)
             truthComparisonStats.tn += 1
+    elif truth_px == PX_OUTSIDE \
+            or truth_px == PX_UNKNOWN:
+        # Ignored, outside of region of interest
+        pass
+    elif truth_px == PX_MOTION or truth_px == PX_SHADOW:
+        # Consider the ground truth foreground
+
+        if IsInputForeground(input_px):
+            # FG (True: FG)
+            truthComparisonStats.tp += 1
+            truthComparisonStats.marker = [255, 255, 255]
+        else:
+            # BG (True: FG)
+            truthComparisonStats.fn += 1
+            truthComparisonStats.marker = [192, 192, 0]
+
     return truthComparisonStats
 
 def CalculateFrameStats( h, w, truth_frame, input_frame, showDiff ):
