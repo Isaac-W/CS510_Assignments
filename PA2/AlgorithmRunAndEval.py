@@ -56,6 +56,7 @@ def processFrame( model, writer, frame, height, width, params ):
     # combined = model.foreGround
 
     channel = np.zeros((height, width, 1), np.uint8)
+    # fullSized = cv2.pyrUp(cv2.pyrUp(cv2.pyrUp(model.foreGround)))
     fullSized = cv2.pyrUp(model.foreGround)
     fullSized = postProcessing(fullSized)
 
@@ -87,7 +88,7 @@ def isTruthFrameSkippable( truth_frame ):
     return npArrayUniform(flattenedImage) and not found
 
 def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
-        model, writer, diffWriter, height, width ):
+        model, writer, diffWriter, overlayWriter, height, width ):
 
     # Calculate and display megapixels.
     megapixels = height * width / 1000000.0
@@ -137,6 +138,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             if params.doEval:
                 truth_ret, truth_frame = truth_cap.read()
             input_ret, input_frame = input_cap.read()
+            input_frame_overlay = input_frame
 
             if truth_frame is None or input_frame is None:
                 break
@@ -198,10 +200,18 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
                     timeForEachFrame)
 
             # Show the results with detection and write it to the file buffer.
-            applyDetection(toShow)
+            applyDetection(toShow, input_frame_overlay)
             cv2.imshow('Processing Results', toShow)
             writer.write(toFile)
-            
+
+            cv2.imshow('size', input_frame)
+            k = cv2.waitKey(1)
+
+            if params.showOverlay:
+                overlayWriter.write( input_frame_overlay )
+                cv2.imshow('overlayFrame', input_frame_overlay )
+
+
             # Grab the key pressed.
             k = cv2.waitKey(100)
             
@@ -211,7 +221,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
         pass
     return frame_number, processedFrames, evalFrames, videoStats
 
-def applyDetection(im):
+def applyDetection(im, inFrame):
     #print im.shape[2]
     imgray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     ret, thresh = cv2.threshold(imgray, 127, 255, 0)
@@ -237,6 +247,7 @@ def applyDetection(im):
                     maxy = pts[0][1]
         #print minx, miny, maxx, maxy
             cv2.rectangle(im, (minx, miny), (maxx, maxy), (0, 255, 0), 1)
+            cv2.rectangle(inFrame, (minx, miny), (maxx, maxy), (255, 0, 0), 1)
 
 class Params:
     def __init__(self, input_path):
@@ -246,6 +257,7 @@ class Params:
         self.showDiff = False
         self.showTruth = False
         self.showInput = False
+        self.showOverlay = False
         self.startFrame = 0
         self.input_path = input_path
         self.truth_path = None
@@ -284,6 +296,8 @@ def readArgs( params ):
             params.showInput = True
         elif currentArg == '-Sd':
             params.showDiff = True
+        elif currentArg == '-So':
+            params.showOverlay = True
         elif currentArg == '-St':
             params.showTruth = True
         elif currentArg == '-t':
@@ -376,6 +390,15 @@ def main():
             print 'Error--Could not write to diff video:', output_path
             return
 
+    overlayWriter = None
+    if programParams.showOverlay:
+        # Create an a video writer so that the original video with detection overlay can be saved.
+        output_path = sourceName + '_overlay' + file_extension
+        overlayWriter = cv2.VideoWriter(output_path, codec, fps, (width, height))
+        if not writer:
+            print 'Error--Could not write to overlay video:', output_path
+            return
+
     # Fast forward past <params.startFrame> frames.
     if not programParams.no_out:
         print "Skipping %d frames." % programParams.startFrame
@@ -393,6 +416,7 @@ def main():
         print "Performing initialization..."
     startTime = time.time()
     model = vibe.Model(input_cap)
+
     endTime = time.time()
 
     # Display time results.
@@ -402,7 +426,7 @@ def main():
 
     frame_number, processedFrames, evalFrames, videoStats = \
         processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, programParams, 
-            model, writer, diffWriter, height, width )
+            model, writer, diffWriter, overlayWriter, height, width )
 
     # Calculate frame averages
     if programParams.doEval and evalFrames > 0:

@@ -365,7 +365,7 @@ def get_frame(cap):
 def preprocess_frame(frame):
     # Downsample frame
     frame = cv2.pyrDown(frame)
-    # frame = cv2.pyrDown(cv2.pyrDown(frame))
+    # frame = cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(frame)))
     # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
     return frame
 
@@ -380,7 +380,11 @@ def get_frame_shape(cap):
 
     # Downsample frame size (for pyrDown)
     h = (h + 1) / 2
+    # h = (h + 1) / 2
+    # h = (h + 1) / 2
     w = (w + 1) / 2
+    # w = (w + 1) / 2
+    # w = (w + 1) / 2
 
     # 3 channels for RGB
     channels = 3
