@@ -72,6 +72,44 @@ def postProcessing(frame):
 
     return median
 
+def contourDetection(foreground, frame, videoWriter):
+
+    #imgray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    ret, thresh = cv2.threshold(foreground, 127, 255, 0)
+    im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    #print len(contours)
+    for contour in contours:
+        if len(contour) > 45:
+            minx = contour[0][0][0]
+            maxx = contour[0][0][0]
+            #print contour[0][0]
+            miny = contour[0][0][1]
+            maxy = contour[0][0][1]
+            for pts in contour:
+                #print pts[0]
+                if pts[0][0] < minx:
+                    minx = pts[0][0]
+                if pts[0][0] > maxx:
+                    maxx = pts[0][0]
+                if pts[0][1] < miny:
+                    miny = pts[0][1]
+                if pts[0][1] > maxy:
+                    maxy = pts[0][1]
+        #print minx, miny, maxx, maxy
+            cv2.rectangle(frame, (minx, miny), (maxx, maxy), (0, 255, 0), 1)
+
+    channel = np.zeros((frame.shape[1], frame.shape[0], 1), np.uint8)
+
+    #combinedFiltered = cv2.merge((
+    #            cv2.bitwise_or(channel, im2),
+    #            cv2.bitwise_or(channel, im2),
+    #            cv2.bitwise_or(channel, im2)
+    #        ))
+
+    cv2.imshow('Detection', frame)
+    videoWriter.write(frame)
+
 def main():
     # Display error if the program needs more args
     if len(sys.argv) < MIN_ARGS + 1:
@@ -153,9 +191,11 @@ def main():
             # combined = model.foreGround
 
             outImageUp = cv2.pyrUp(model.foreGround)
+            frame = cv2.pyrUp(frame)
 
 
             closing = postProcessing(outImageUp)
+            contourDetection(closing, frame, writerFilter)
 
             channel = np.zeros((height, width, 1), np.uint8)
             combined = cv2.merge((
@@ -164,17 +204,17 @@ def main():
                 cv2.bitwise_or(channel, outImageUp)
             ))
 
-            combinedFiltered = cv2.merge((
+            """combinedFiltered = cv2.merge((
                 cv2.bitwise_or(channel, closing),
                 cv2.bitwise_or(channel, closing),
                 cv2.bitwise_or(channel, closing)
-            ))
+            ))"""
 
             # Show the results and write it to the file buffer.
             cv2.imshow('image', combined)
-            cv2.imshow('Filtered', combinedFiltered)
+            #cv2.imshow('Filtered', combinedFiltered)
             writer.write(combined)
-            writerFilter.write(combinedFiltered)
+            #writerFilter.write(combinedFiltered)
 
             # Grab the key pressed.
             k = cv2.waitKey(100)
