@@ -139,7 +139,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             processedFrames += 1
             
             # Skip the frame if does not contain evaluation.
-            if not hasReachedFirstEvalFrame:
+            if params.doEval and not hasReachedFirstEvalFrame:
                 hasReachedFirstEvalFrame = (
                     not isTruthFrameSkippable(truth_frame)
                 )
