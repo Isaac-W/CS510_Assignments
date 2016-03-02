@@ -24,6 +24,22 @@ import Evaluate as e
 # Minimum args required.
 MIN_ARGS = 1
 
+def postProcessing(frame):
+
+    """
+    # Create the kernel used for filtering
+    kernel = np.ones((5,5),np.uint8)
+    # Removing small and random noise (like isolated white pts)
+    opening = cv2.morphologyEx(frame, cv2.MORPH_OPEN, kernel)
+    # Expanding the white pixels to get more connected pixels
+    dilation = cv2.dilate(opening,kernel,iterations = 1)
+    # Filling the holes in the white pixels, to improve detection
+    closing = cv2.morphologyEx(dilation, cv2.MORPH_CLOSE, kernel)"""
+
+    median = cv2.medianBlur(frame,5)
+
+    return median
+
 def processFrame( model, writer, frame, height, width, params ):
     # Run ViBe on the current frame to update the model.
     frameStartTime = time.time()
@@ -41,6 +57,8 @@ def processFrame( model, writer, frame, height, width, params ):
 
     channel = np.zeros((height, width, 1), np.uint8)
     fullSized = cv2.pyrUp(model.foreGround)
+    fullSized = postProcessing(fullSized)
+
     resultOneChannel = cv2.bitwise_or(channel, fullSized)
     combined = cv2.merge((
         resultOneChannel,
