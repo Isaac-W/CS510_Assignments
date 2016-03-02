@@ -452,6 +452,11 @@ def main():
             print "Saving results video."
         writer.release()
 
+    if overlayWriter:
+        if not programParams.no_out:
+            print "Saving object detection results video."
+        overlayWriter.release()
+
 # Run main if this was the main module.
 if __name__ == '__main__':
     from timeit import Timer
