@@ -56,6 +56,21 @@ def createVideoWriter(output_file, codec, fps, width, height):
 # Minimum args required.
 MIN_ARGS = 1
 
+def postProcessing(frame):
+
+    """
+    # Create the kernel used for filtering
+    kernel = np.ones((5,5),np.uint8)
+    # Removing small and random noise (like isolated white pts)
+    opening = cv2.morphologyEx(frame, cv2.MORPH_OPEN, kernel)
+    # Expanding the white pixels to get more connected pixels
+    dilation = cv2.dilate(opening,kernel,iterations = 1)
+    # Filling the holes in the white pixels, to improve detection
+    closing = cv2.morphologyEx(dilation, cv2.MORPH_CLOSE, kernel)"""
+
+    median = cv2.medianBlur(frame,5)
+
+    return median
 
 def main():
     # Display error if the program needs more args
@@ -84,6 +99,7 @@ def main():
     # Create an a video writer so that the resuls can be saved.
     output_path = sourceName + '_outvibe' + file_extension
     writer = cv2.VideoWriter(output_path, codec, fps, (width, height))
+    writerFilter = cv2.VideoWriter("FilteredOutput.avi", codec, fps, (width, height))
     if not writer:
         print 'Error--Could not write to magnitude video:', output_path
         return
@@ -136,16 +152,29 @@ def main():
             # blank_image = numpy.zeros((height, width), numpy.uint8)
             # combined = model.foreGround
 
+            outImageUp = cv2.pyrUp(model.foreGround)
+
+
+            closing = postProcessing(outImageUp)
+
             channel = np.zeros((height, width, 1), np.uint8)
             combined = cv2.merge((
-                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
-                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround)),
-                cv2.bitwise_or(channel, cv2.pyrUp(model.foreGround))
+                cv2.bitwise_or(channel, outImageUp),
+                cv2.bitwise_or(channel, outImageUp),
+                cv2.bitwise_or(channel, outImageUp)
+            ))
+
+            combinedFiltered = cv2.merge((
+                cv2.bitwise_or(channel, closing),
+                cv2.bitwise_or(channel, closing),
+                cv2.bitwise_or(channel, closing)
             ))
 
             # Show the results and write it to the file buffer.
             cv2.imshow('image', combined)
+            cv2.imshow('Filtered', combinedFiltered)
             writer.write(combined)
+            writerFilter.write(combinedFiltered)
 
             # Grab the key pressed.
             k = cv2.waitKey(100)
