@@ -97,7 +97,7 @@ class Model:
         pixels and the sample space.
     """
 
-    def __init__(self, videoCapture, params=Params()):
+    def __init__(self, videoCapture, runnerParams, params=Params()):
         """
         Description:
             Initializes the model.
@@ -107,8 +107,9 @@ class Model:
                 to initialize the algorithm.
             params (Params): the params control how the algorithm works.
         """
-        self.foreGround, self.samples = init_model(videoCapture, params)
+        self.foreGround, self.samples = init_model(videoCapture, params, runnerParams)
         self.params = params
+        self.runnerParams = runnerParams
 
     def update(self, frame):
         """
@@ -147,7 +148,7 @@ def TwoVariableIterator(h, w, sr=0, sc=0):
             yield (r, c)
 
 
-def init_model(videoCapture, params):
+def init_model(videoCapture, params, runnerParams):
     """
     Description:
         Initializes the memory for the algorithm such as the sample space.
@@ -156,14 +157,14 @@ def init_model(videoCapture, params):
         params (Params): the params control how the algorithm works.
     """
 
-    h, w, channels = get_frame_shape(videoCapture)
+    h, w, channels = get_frame_shape(videoCapture, runnerParams.pyrNum)
 
     # Make foreground buffer
     # Foreground buffer is one-channel: foreground/background
     foreGround = np.zeros((h, w, 1), dtype=NP_ELEMENT_TYPE)
 
     #ret, avg = get_frame(videoCapture)
-    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels))
+    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels), runnerParams.pyrNum)
 
     # Create the array of previous samples
     # Initialize the samples to the neighborhood
@@ -175,12 +176,12 @@ def init_model(videoCapture, params):
     return foreGround, samples
 
 
-def averageFrames(videoCapture, numberOfFrames, ndSize):
+def averageFrames(videoCapture, numberOfFrames, ndSize, pyrNum):
     total = np.zeros(ndSize, dtype=np.uint32)
     h, w, channels = ndSize
 
     for n in range(numberOfFrames):
-        ret, frame = get_frame(videoCapture)
+        ret, frame = get_frame(videoCapture, pyrNum)
 
         for (r, c) in TwoVariableIterator(h, w):
             # Compute totals
@@ -355,17 +356,17 @@ def IsPixelPartOfBackground(channelSamples, r, c, frame, noMin, maxHistory, R):
     return False
 
 
-def get_frame(cap):
+def get_frame(cap, pyrNum):
     ret, frame = cap.read()
     if ret and frame is not None:
-        frame = preprocess_frame(frame)
+        frame = preprocess_frame(frame, pyrNum)
     return ret, frame
 
 
-def preprocess_frame(frame):
+def preprocess_frame(frame, pyrNum):
     # Downsample frame
-    frame = cv2.pyrDown(frame)
-    # frame = cv2.pyrDown(cv2.pyrDown(cv2.pyrDown(frame)))
+    for pyr in range(pyrNum):
+        frame = cv2.pyrDown(frame)
     # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
     return frame
 
@@ -374,17 +375,14 @@ def postprocess_frame(frame):
     return frame
 
 
-def get_frame_shape(cap):
+def get_frame_shape(cap, pyrNum):
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
     # Downsample frame size (for pyrDown)
-    h = (h + 1) / 2
-    # h = (h + 1) / 2
-    # h = (h + 1) / 2
-    w = (w + 1) / 2
-    # w = (w + 1) / 2
-    # w = (w + 1) / 2
+    for pyr in range(pyrNum):
+        h = (h + 1) / 2
+        w = (w + 1) / 2
 
     # 3 channels for RGB
     channels = 3

@@ -57,7 +57,9 @@ def processFrame( model, writer, frame, height, width, params ):
 
     channel = np.zeros((height, width, 1), np.uint8)
     # fullSized = cv2.pyrUp(cv2.pyrUp(cv2.pyrUp(model.foreGround)))
-    fullSized = cv2.pyrUp(model.foreGround)
+    fullSized = model.foreGround
+    for pyr in range(model.runnerParams.pyrNum):
+        fullSized = cv2.pyrUp(fullSized)
     fullSized = postProcessing(fullSized)
 
     resultOneChannel = cv2.bitwise_or(channel, fullSized)
@@ -152,7 +154,7 @@ def processAndAnalyzeVideo( truth_cap, input_cap, csv_writer, params,
             if not params.no_out:
                 print "Frame:", frame_number
             
-            input_frame = vibe.preprocess_frame(input_frame)
+            input_frame = vibe.preprocess_frame(input_frame, params.pyrNum)
             
             toShow, toFile = processFrame( 
                 model, writer, input_frame, height, width, params )
@@ -262,6 +264,7 @@ class Params:
         self.input_path = input_path
         self.truth_path = None
         self.stopFrame = sys.maxint
+        self.pyrNum = 1
 
 class BadArgumentsException(Exception):
     pass
@@ -300,6 +303,14 @@ def readArgs( params ):
             params.showOverlay = True
         elif currentArg == '-St':
             params.showTruth = True
+        elif currentArg == '-p':
+            i = i + 1
+            assertHasArgumentIndex( i, '-p', "<pyrNum>")
+            try:
+                params.pyrNum = int(sys.argv[i])
+            except ValueError:
+                raise BadArgumentsException(
+                    "Expected int for argument '%s'" % '-p'  )
         elif currentArg == '-t':
             i = i + 1
             assertHasArgumentIndex( i, '-t', "<startFrame>")
@@ -415,7 +426,7 @@ def main():
     if not programParams.no_out:
         print "Performing initialization..."
     startTime = time.time()
-    model = vibe.Model(input_cap)
+    model = vibe.Model(input_cap, programParams)
 
     endTime = time.time()
 
