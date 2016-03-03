@@ -29,3 +29,16 @@ Argument Notes:
 The -e argument must be given for any of the evaluation mode arguments to have
 an effect. Regardless, the program will not warn if evaluation mode arguments
 are given.
+
+Here are some examples of how to run the program. Make sure python 2.7 is used with OpenCV 3.1.
+
+Example 1 -- Processing only
+
+python AlgorithmRunAndEval.py assets\PETS2006\input.avi
+
+
+Example 2 -- Processing and evaluation. The program also displays the
+ differences and shows object detection boxes.
+
+python AlgorithmRunAndEval.py assets\PETS2006\input.avi -e assets\P
+ETS2006\gt.avi -Sd -So
