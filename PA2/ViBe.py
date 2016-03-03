@@ -163,15 +163,15 @@ def init_model(videoCapture, params, runnerParams):
     # Foreground buffer is one-channel: foreground/background
     foreGround = np.zeros((h, w, 1), dtype=NP_ELEMENT_TYPE)
 
-    #ret, avg = get_frame(videoCapture)
-    avg = averageFrames(videoCapture, params.initFrames, (h, w, channels), runnerParams.pyrNum)
+    ret, avg = get_frame(videoCapture, runnerParams.pyrNum)
+    #avg = averageFrames(videoCapture, params.initFrames, (h, w, channels), runnerParams.pyrNum)
 
     # Create the array of previous samples
     # Initialize the samples to the neighborhood
     samples = sampleFromNeighborhood(avg, params.maxHistory)
 
     # Initialize the samples to the background.
-    # samples = sampleFromSelf(avg, params.maxHistory)
+    #samples = sampleFromSelf(avg, params.maxHistory)
 
     return foreGround, samples
 
@@ -367,7 +367,7 @@ def preprocess_frame(frame, pyrNum):
     # Downsample frame
     for pyr in range(pyrNum):
         frame = cv2.pyrDown(frame)
-    # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB);
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
     return frame
 
 
