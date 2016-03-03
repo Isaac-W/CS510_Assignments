@@ -11,20 +11,34 @@ python version : 2.7
 opencv version : 3.1
 requires numpy python module
 
-Usage: python AlgorithmRunAndEval.py <input video> [flags..]
-
+Usage: AlgorithmRunAndEval.py <input video> [flags..] [-t <startFrame> ]
+-----------------------------------------------
 Argument descriptions:
-   -e <ground truth video> -- evaluate the results. Turn on evaluation mode.
-   -s -- silent; run without console output.
-   -Si -- show input frames.
-   -t <startFrame> -- start running after <startFrame> frames.
+       -e <ground truth video> -- evaluate the results. Turn on evaluation mode.
+       -s  -- silent; run without console output.
+       -Si -- show input frames.
+       -So -- show overlay. Puts boxes around detected objects.
+       -t <startFrame> -- start running after <startFrame> frames.
 EVALUATION MODE:
-   -n -- no csv output.
-   -Sd -- show diff frame.
-   -St -- show truth frame.
+       -n  -- no csv output.
+       -Sd -- show diff frame.
+       -St -- show truth frame.
 
 Argument Notes:
 
 The -e argument must be given for any of the evaluation mode arguments to have
-an effect. Regardless, evaluation mode arguments may still be given and no error
-will be generated.
+an effect. Regardless, the program will not warn if evaluation mode arguments
+are given.
+
+Here are some examples of how to run the program. Make sure python 2.7 is used with OpenCV 3.1.
+
+Example 1 -- Processing only
+
+python AlgorithmRunAndEval.py assets\PETS2006\input.avi
+
+
+Example 2 -- Processing and evaluation. The program also displays the
+ differences and shows object detection boxes.
+
+python AlgorithmRunAndEval.py assets\PETS2006\input.avi -e assets\P
+ETS2006\gt.avi -Sd -So
