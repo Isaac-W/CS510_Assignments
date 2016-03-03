@@ -336,6 +336,7 @@ def showUsage():
     print '       -e <ground truth video> -- evaluate the results. Turn on evaluation mode.'
     print '       -s -- silent; run without console output.'
     print '       -Si -- show input frames.'
+    print '       -So -- show overlay. Puts boxes around detected objects.'
     print '       -t <startFrame> -- start running after <startFrame> frames.'
     print 'EVALUATION MODE:'
     print '       -n -- no csv output.'
