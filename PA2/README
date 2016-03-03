@@ -11,6 +11,14 @@ python version : 2.7
 opencv version : 3.1
 requires numpy python module
 
+Setup Instructions for CSU computer labs. Run the following commands before
+ running python.
+
+export PYTHONPATH="/usr/local/OpenCV/lib/python2.7/site-packages:PYTHONPATH"
+export LD_LIBRARY_PATH="/usr/local/ffmpeg/lib:LD_LIBRARY_PATH"
+
+
+
 Usage: AlgorithmRunAndEval.py <input video> [flags..] [-t <startFrame> ]
 -----------------------------------------------
 Argument descriptions:
