@@ -50,3 +50,22 @@ Example 2 -- Processing and evaluation. The program also displays the
 
 python AlgorithmRunAndEval.py assets\PETS2006\input.avi -e assets\P
 ETS2006\gt.avi -Sd -So
+
+
+Videos from our Traditional ViBe Experiment:
+
+Cars:
+Foreground: https://youtu.be/9r2mKXVSsMA
+Overlay: https://youtu.be/UmRx0oJm47g
+
+Pedestrians:
+Foreground: https://youtu.be/eu9Aol-Ghuk
+Overlay: https://youtu.be/PbQmlhLcX7k
+
+Sofa:
+Foreground: https://youtu.be/s7vCWeQ5IPE
+Overlay: https://youtu.be/J7dAdUooAFs
+
+Train:
+Foreground: https://youtu.be/ZWDQk89b0wA
+Overlay: https://youtu.be/5hUB4BGwjkg
