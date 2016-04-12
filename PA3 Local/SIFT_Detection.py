@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import math
 import random
+from matplotlib import pyplot as plt
 
 RATIO_THRESHOLD = 0.8  # match1 / match2 must be less than this to consider a match good, and not arbitrary
 MIN_MATCHES = 4  # Good matches required to consider matched!
@@ -11,7 +12,6 @@ MIN_MATCHES = 4  # Good matches required to consider matched!
 # Init colors
 random.seed(1)
 colors = [(random.randrange(256), random.randrange(256), random.randrange(256)) for i in range(100)]
-
 
 class Rectangle:
     def __init__(self, x1, y1, x2, y2):
@@ -42,17 +42,79 @@ class Rectangle:
 
 
 class DetectedObject:
-    def __init__(self, bounds, image, mask, keypoints, descriptors):
+    def __init__(self, bounds, image, mask, keypoints, descriptors, objectNum):
         self.bounds = bounds
         self.image = image
         self.mask = mask
         self.keypoints = keypoints
         self.descriptors = descriptors
         self.tracked = True
+        self.kalman_filter = kalFilter(self.bounds, objectNum)
+
+class kalFilter:
+    def __init__(self, bounds, objectNum):
+        self.meas=[]
+        self.pred=[]
+        self.objectNum = objectNum
+        # self.frame = np.zeros((400,400,3), np.uint8) # drawing canvas
+        self.mp = np.array((2,1), np.float32) # measurement
+        # self.tp = np.zeros((2,1), np.float32) # tracked / prediction
+        self.tp = np.array([[np.float32(bounds.center_x)],[np.float32(bounds.center_y)]])
+        self.currentPrediction = (bounds.center_x,bounds.center_y)
+
+        # cv2.namedWindow("kalman")
+        # cv2.setMouseCallback("kalman",onmouse);
+        self.kalman = cv2.KalmanFilter(4,2)
+        self.kalman.measurementMatrix = np.array([[1,0,0,0],[0,1,0,0]],np.float32)
+        self.kalman.transitionMatrix = np.array([[1,0,1,0],[0,1,0,1],[0,0,1,0],[0,0,0,1]],np.float32)
+        self.kalman.processNoiseCov = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],np.float32) * .003
+        # self.kalman.processNoiseCov = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],np.float32) * 0.03
+
+        # APPLY KALMAN
+        track_x, track_y = bounds.center_x,bounds.center_y
+        self.meas.append( (track_x, track_y) )
+        for i in range(100):
+            self.mp = np.array([[np.float32(track_x)],[np.float32(track_y)]])
+            self.kalman.correct(self.mp)
+            self.predict()
+
+        # self.fig = plt.figure(self.objectNum)
+        # self.fig.add_axes([0,520,360,0])
+        # self.ax = self.fig.add_subplot(2,1,1)
+        # self.fig.plot([i[0] for i in self.meas],[i[1] for i in self.meas],'xr',label='measured')
+        # plt.axis([0,520,360,0])
+        # self.ax.hold(True)
+        # self.fig.plot([i[0] for i in self.pred],[i[1] for i in self.pred],'ob',label='kalman output')
+        # self.ax.legend(loc=2)
+        # self.ax.title("Constant Velocity Kalman Filter")
+        # self.ax.show()
+
+    def update(self, track_x, track_y):
+
+        # APPLY KALMAN
+        self.meas.append( (track_x, track_y) )
+        self.mp = np.array([[np.float32(track_x)],[np.float32(track_y)]])
+        self.kalman.correct(self.mp)
+        self.predict()
+
+
+        # plt.figure(self.objectNum)
+        # self.ax.plot([i[0] for i in self.meas],[i[1] for i in self.meas],'xr',label='measured')
+        # plt.axis([0,520,360,0])
+        # plt.hold(False)
+        # self.ax.plot([i[0] for i in self.pred],[i[1] for i in self.pred],'ob',label='kalman output')
+        # plt.legend(loc=2)
+        # plt.title("Constant Velocity Kalman Filter")
+        # plt.show()
+
+    def predict(self):
+        tp = self.kalman.predict()
+        self.pred.append((int(tp[0]),int(tp[1])))
+        self.currentPrediction = (int(tp[0]),int(tp[1]))
 
 
 trackedObjects = []
-
+objectNum = 0
 
 def applyDetection(im, inFrame):
     #imgray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
@@ -86,8 +148,9 @@ def applyDetection(im, inFrame):
             keypoints, descriptors = sift.detectAndCompute(image, None)
 
             #cv2.imshow("Current Object", image)
-
-            objects.append(DetectedObject(bounds, image, mask, keypoints, descriptors))
+            global objectNum
+            objects.append(DetectedObject(bounds, image, mask, keypoints, descriptors, objectNum))
+            objectNum = objectNum + 1
 
     return objects
 
@@ -115,6 +178,10 @@ def trackObjects(frame, fgmask, objects):
     print '*** Current tracks ****************'
     for track_index, track in enumerate(trackedObjects):
         if not track.tracked:
+            # track_x = track.bounds.center_x
+            # track_y = track.bounds.center_y
+            # track.kalman_filter.update(track_x, track_y)
+            track.kalman_filter.predict()
             continue
 
         # Look at new boxes, and look for matches
@@ -125,6 +192,8 @@ def trackObjects(frame, fgmask, objects):
 
         track_x = track.bounds.center_x
         track_y = track.bounds.center_y
+
+        track.kalman_filter.update(track_x, track_y)
 
         # Sort objects by closest to last tracked position
         closestObjects = sorted(
@@ -202,6 +271,11 @@ def trackObjects(frame, fgmask, objects):
                 track.keypoints = detectedObject.keypoints
                 track.descriptors = detectedObject.descriptors
 
+                # KALMAN
+                track_x = track.bounds.center_x
+                track_y = track.bounds.center_y
+                detectedObject.kalman_filter.update(track_x, track_y)
+
                 track.tracked = True
 
                 # TODO
@@ -277,6 +351,11 @@ def trackObjects(frame, fgmask, objects):
                 track.keypoints = detectedObject.keypoints
                 track.descriptors = detectedObject.descriptors
 
+                # KALMAN
+                track_x = track.bounds.center_x
+                track_y = track.bounds.center_y
+                detectedObject.kalman_filter.update(track_x, track_y)
+
                 track.tracked = True
 
                 # TODO
@@ -302,6 +381,8 @@ def drawObjects(frame, objects):
         item = objects[i]
 
         if not item.tracked:
+            item.kalman_filter.predict()
+            cv2.circle(output, item.kalman_filter.currentPrediction, 8, (0,0,255), 5)
             continue
 
         bounds = item.bounds
@@ -311,6 +392,11 @@ def drawObjects(frame, objects):
 
         cv2.rectangle(output, (bounds.x1, bounds.y1), (bounds.x2, bounds.y2), colors[i % len(colors)], 1)
         cv2.circle(output, bounds.center, 4, colors[i % len(colors)], 2)
+
+        # KALMAN
+        # print item.kalman_filter.currentPrediction
+        cv2.circle(output, item.kalman_filter.currentPrediction, 8, (0,0,255), 5)
+
         cv2.putText(output, 'Object ' + str(i), (bounds.x1, bounds.y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i % len(colors)], 1)
 
         drawnBounds.append(bounds.center)
@@ -340,6 +426,7 @@ def main():
     while True:
         # Get frame
         ret, frame = cap.read()
+        cv2.rectangle(frame, (130, 60), (170, 200), (255,0,0), 40)
         if ret is False or frame is None:
             break
 

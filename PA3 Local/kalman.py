@@ -33,6 +33,7 @@ kalman.processNoiseCov = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],np.f
 while True:
     kalman.correct(mp)
     tp = kalman.predict()
+    print mp
     pred.append((int(tp[0]),int(tp[1])))
     paint()
     cv2.imshow("kalman",frame)
