@@ -15,9 +15,9 @@ NON_TRACKED_LIMIT = 60
 CONTOUR_SIZE_THRESHOLD = 45
 
 # Labels for classification
-CAR_LABEL = 2
+CAR_LABEL = 0
 PEDESTRIAN_LABEL = 1
-RANDOM_LABEL = 0
+RANDOM_LABEL = 2
 
 # Global ID to have unique ID for each track
 TRACK_ID_COUNTER = 0
@@ -25,6 +25,7 @@ TRACK_ID_COUNTER = 0
 # Colors of bounding boxes of each type of track
 TRACKED_COLOR = (0, 255, 0)
 PREDICTED_COLOR = (255, 0, 0)
+TEXT_COLOR = (0, 0, 0)
 
 # Minimum number of point to match between object and track
 MIN_PTS_THRESHOLD = 4
@@ -137,7 +138,9 @@ def applyDetection(im, inFrame, hog, clf):
             # Extracting HOG feature vector from template center
             location = ((image.shape[1] / 2, image.shape[0] / 2),)
             h = hog.compute(image, (1, 1), (2, 2), location)
-            """ TODO Adding area, width and height to hog vector for classification """
+            # Adding width and height as features
+            addition = np.array([image.shape[0], image.shape[1]]).reshape(-1, 1)
+            h = np.vstack((h, addition))
             # Classify template using pre-trained SVM classifier
             h = h.T
             label = clf.predict(h)
@@ -156,7 +159,7 @@ def matchObjectTrack(object, track, matcher, MIN_PTS_THRESHOLD, frame_number):
 
         matches = matcher.knnMatch(track.currentDescriptor, object.descriptors, k=2)
 
-        # Apply Lowe's ratio test to determine a good match TODO
+        # Apply Lowe's ratio test to determine a good match
         good = []
         goodList = []
         for match in matches:
@@ -231,6 +234,7 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number):
                     trackToKeep = track
             # Update the oldest matched track
             trackToKeep.update(object)
+
     # Increment the counter for tracks with no matches
     for track in trackList:
         if not track.tracked:
@@ -242,7 +246,7 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number):
             trackList.append(Track(object, TRACK_ID_COUNTER))
             TRACK_ID_COUNTER += 1
 
-    # Remove tracks that have been idle for a certain number of frames
+    # Remove tracks that have been idle for a certain number of frames and have a consistent label of RANDOM
     trackList[:] = [track for track in trackList if (not track.numberOfFramesNotTracked > NON_TRACKED_LIMIT) and
                     (not track.modeLabel == RANDOM_LABEL)]
     print len(trackList)
@@ -265,13 +269,11 @@ def drawTracks(trackList, frame):
                                     (track.currentBounds.x2, track.currentBounds.y2), TRACKED_COLOR, 1)
             cv2.putText(outputFrame, '# ' + str(track.id) + " - " + label, (track.currentBounds.x1,
                                                                             track.currentBounds.y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, TEXT_COLOR, 1)
 
         """ TODO add drawing for predicted tracks """
 
     return outputFrame
-
-
 
 
 def postProcessing(frame):
@@ -314,7 +316,7 @@ def main():
     #fps = float(cap.get(cv2.CAP_PROP_FPS))
     #codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
-    skvideo_writer = skvideo.io.VideoWriter("HOG_SVM_3Classes.avi", frameSize=(width,height))
+    skvideo_writer = skvideo.io.VideoWriter("HOG_SVM_3ClassesPark.avi", frameSize=(width,height))
     skvideo_writer.open()
     #dst_writer = cv2.VideoWriter("output.avi", codec, fps, (width, height))
 
@@ -325,7 +327,7 @@ def main():
     winSize = (8, 8)
     blockSize = (8, 8)
     blockStride = (8, 8)
-    cellSize = (4, 4)
+    cellSize = (2, 2)
     nbins = 8
     derivAperture = 1
     winSigma = 4.
@@ -338,7 +340,7 @@ def main():
 
 
     # Load pre-trained SVM classifier
-    clf = joblib.load('SVM_Linear_TrainedOnGardenTemplates.pkl')
+    clf = joblib.load('SVM_OVOLinear_CarsPeopleRandom.pkl')
 
     trackList = []
     # Main loop
