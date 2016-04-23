@@ -6,7 +6,7 @@ from sklearn.externals import joblib
 import sys
 from scipy import stats
 import os
-import MOSSE
+# import MOSSE
 import copy
 
 # The length of history labels for each track
@@ -352,6 +352,8 @@ class Track(object):
         self.labelsList = [detectedObject.label]
         self.modeLabel = detectedObject.label
 
+        self.most_recent_frames = []
+
         # Create Kalman filter
         self.kalman_filter = kalFilter(self.currentBounds, self.id)
 
@@ -372,7 +374,7 @@ class Track(object):
         self.tracked = True
         self.acceptedOffers.append(detectedObject)
 
-    def update(self, detectedObject):
+    def update(self, detectedObject, current_frame):
         """
         Matches the track to the given object
         :param detectedObject:
@@ -392,6 +394,9 @@ class Track(object):
         # Updating the labels history
         if len(self.labelsList) >= MAX_LABEL_HISTORY:
             self.labelsList.pop()
+
+        # Update the frame history
+        self.most_recent_frames.append(current_frame)
 
         self.labelsList.append(detectedObject.label)
         self.modeLabel = stats.mode(self.labelsList)
@@ -681,7 +686,7 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame):
 
             # Create new meta-object
             new_object = DetectedObject.createFromFrame(frame, new_bounds)
-            track.update(new_object)
+            track.update(new_object, frame)
         elif not track.tracked:
             # Orphaned track (no one accepted an offer)
             track.notifyOrphaned()
@@ -758,6 +763,68 @@ def postProcessing(frame):
 
     return opening
 
+def identifyTrackMovements(track_list, gestures):
+
+    clip_length = 30
+
+    for track in track_list:
+        print "-.-.-.-.-.-.-.-.-.-."
+        print track.id, len(track.most_recent_frames[-1*clip_length:])
+
+        frames_from_track = track.most_recent_frames[-1*clip_length:]
+
+        correct_gesture = get_gesture(frames_from_track, gestures)
+        print correct_gesture[1]
+
+def get_gesture(frames_from_track, gestures):
+
+    closest_diff = float("inf")
+    correct_gesture = None
+
+    for gesture in gestures:
+        num_frames = len(frames_from_track)
+        current_diff = compute_subspace_difference(frames_from_track, gesture[0][-1*num_frames:])
+        print current_diff
+        if current_diff < closest_diff:
+            closest_diff = current_diff
+            correct_gesture = gesture
+
+    return correct_gesture
+
+
+def compute_subspace_difference(track, gesture):
+    print(len(track) == len(gesture))
+
+def load_gestures(paths):
+
+    gestures = [([],path) for i, path in enumerate(paths)]
+
+    for index, current_path in enumerate(paths):
+        print current_path
+        cap = cv2.VideoCapture(current_path)
+
+        if not cap.isOpened():
+            print 'Error--Unable to open video:', current_path
+            return
+
+        # Get video parameters (try to retain same attributes for output video)
+        # width = cap.width
+        # height = cap.height
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = float(cap.get(cv2.CAP_PROP_FPS))
+        codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+
+        while True:
+            # Get frame
+            ret, frame = cap.read()
+
+            gestures[index][0].append(frame)
+
+            if ret is False or frame is None:
+                break
+
+    return gestures
 
 def main():
     global sift
@@ -817,6 +884,9 @@ def main():
     # Load pre-trained SVM classifier
     clf = joblib.load('SVM_OVOLinear_CarsPeopleRandom.pkl')
 
+    #Load training gestures
+    gestures = load_gestures([r"C:\Users\trovi_000\Desktop\person15_walking_d1_uncomp.avi"])
+
     trackList = []
     # Main loop
     frame_number = 0
@@ -863,6 +933,14 @@ def main():
         cv2.imshow("Input", outputFrame)
         cv2.imshow("Foreground", fgmask)
 
+
+
+
+        # Implement movement comparisons
+        identifyTrackMovements(trackList, gestures)
+
+
+
         # Write Video To file
         # skvideo_writer.write(outputFrame)
         dst_writer.write(outputFrame)
@@ -872,9 +950,13 @@ def main():
             break
 
     # skvideo_writer.release()
+
     dst_writer.release()
     cap.release()
 
 
 if __name__ == '__main__':
     main()
+
+
+    # person15_walking_d1_uncomp.avi
