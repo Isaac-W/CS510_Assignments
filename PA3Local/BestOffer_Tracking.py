@@ -6,8 +6,11 @@ from sklearn.externals import joblib
 import sys
 from scipy import stats
 import os
-# import MOSSE
+import MOSSE
 import copy
+
+
+DEBUG_OUTPUT = True
 
 # The length of history labels for each track
 MAX_LABEL_HISTORY = 20
@@ -22,9 +25,6 @@ CONTOUR_SIZE_THRESHOLD = 45
 CAR_LABEL = 0
 PEDESTRIAN_LABEL = 1
 RANDOM_LABEL = 2
-
-# Global ID to have unique ID for each track
-TRACK_ID_COUNTER = 0
 
 # Colors of bounding boxes of each type of track
 OBJECT_COLOR = (255, 0, 0)
@@ -43,7 +43,7 @@ RATIO_THRESHOLD = 0.7
 TRACK_OFFER_THRESHOLD = -1
 
 # The size of the predicted search box for track resolution
-PREDICTED_WINDOW_MULTIPLIER = 1.05
+PREDICTED_WINDOW_MULTIPLIER = 1.1
 
 # How many times larger can the destination be to still be considered the same size
 # Destination windows more than this amount will only partially contribute to the track window size
@@ -56,6 +56,40 @@ WINDOW_GROWTH_RATE = 0.1
 sift = None
 hog = None
 clf = None
+
+
+def initFeatureExtractors():
+    global sift, hog, clf, imgsize
+
+    # Create SIFT feature detector
+    sift = cv2.xfeatures2d.SIFT_create()
+
+    # initialize the HOG descriptor To extract feature from image center - These parameters will give 32 features vector
+    imgsize = 32
+    winLen = 16
+    blockLen = 8
+    strideLen = 8
+    cellLen = 2
+
+    winSize = (winLen,winLen)  # Size of input window
+    blockSize = (blockLen,blockLen)  # Size of blocks (each block will have blockSize/cellSize cells)
+    blockStride = (strideLen,strideLen)  # Block shift parameter (e.g. window of 64, block of 32, stride of 16 will have 3 blocks per row)
+    cellSize = (cellLen,cellLen)  # Size of cell (a histogram is computed for each cell in a block)
+    nbins = 9  # The number of bins in the histogram
+    derivAperture = 1
+    winSigma = 4.
+    histogramNormType = 0
+    L2HysThreshold = 2.0000000000000001e-01
+    gammaCorrection = 0
+    nlevels = 64
+    hog = cv2.HOGDescriptor(winSize, blockSize, blockStride, cellSize, nbins, derivAperture, winSigma,
+                            histogramNormType, L2HysThreshold, gammaCorrection, nlevels)
+
+
+    # Load pre-trained SVM classifier
+    clf = joblib.load('SVM_HOG_WANG.pkl')
+
+initFeatureExtractors()
 
 
 def distance(pt1, pt2):
@@ -87,6 +121,10 @@ class Rectangle(object):
             center_x - half_width, center_y - half_height,
             center_x + half_width, center_y + half_height
         )
+
+    @property
+    def points(self):
+        return self.x1, self.y1, self.x2, self.y2
 
     @property
     def corners(self):
@@ -229,12 +267,35 @@ class DetectedObject(object):
         keypoints, descriptors = sift.detectAndCompute(image, None)
 
         # Extracting HOG feature vector from template center
-        location = ((image.shape[1] / 2, image.shape[0] / 2),)
-        h = hog.compute(image, (1, 1), (2, 2), location)
+        orig = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        #"""
+        # Get normalized size (scale so that one side is equal to imgsize; keep ratio fixed)
+
+        h = orig.shape[0]
+        w = orig.shape[1]
+
+        if h < w:
+            w = int(w * float(imgsize) / h)
+            h = imgsize
+        else:
+            h = int(h * float(imgsize) / w)
+            w = imgsize
+
+        im = cv2.resize(orig, (w, h))
+        """
+        # Use full size
+        im = cv2.resize(orig, (imglen, imglen))
+        #"""
+
+        cv2.imshow('Object', im)
+
+        location = ((im.shape[1] / 2, im.shape[0] / 2),)
+        h = hog.compute(im, (1, 1), (2, 2), location)
 
         # Adding width and height as features
-        addition = np.array([image.shape[0], image.shape[1]]).reshape(-1, 1)
-        h = np.vstack((h, addition))
+        addition = np.array([image.shape[0] / float(image.shape[1])]).reshape(-1, 1)
+        #h = np.vstack((h, addition))
 
         # Classify template using pre-trained SVM classifier
         h = h.T
@@ -332,11 +393,11 @@ class kalFilter(object):
 
 
 class Track(object):
-    def __init__(self, detectedObject):
-        global TRACK_ID_COUNTER
+    TRACK_ID_COUNTER = 0  # Assign a unique id to each created track
 
-        self.id = TRACK_ID_COUNTER
-        TRACK_ID_COUNTER += 1
+    def __init__(self, detectedObject):
+        self.id = Track.TRACK_ID_COUNTER
+        Track.TRACK_ID_COUNTER += 1
 
         self.currentBounds = detectedObject.bounds
         self.currentImage = detectedObject.image
@@ -356,6 +417,9 @@ class Track(object):
 
         # Create Kalman filter
         self.kalman_filter = kalFilter(self.currentBounds, self.id)
+
+        self.mosse_active = False
+        self.mosse_filter = None
 
     @property
     def offer_count(self):
@@ -405,9 +469,46 @@ class Track(object):
         # Update Kalman filter
         self.kalman_filter.update(self.currentBounds.center_x, self.currentBounds.center_y)
 
-    def notifyOrphaned(self):
+        # Clear MOSSE filter
+        self.mosse_active = False
+        self.mosse_filter = None
+
+    def notifyOrphaned(self, frame):
+        """
+        # Use MOSSE filter to track when object not detected
+        if not self.mosse_filter:
+            # Create MOSSE filter from previous known image
+            self.mosse_filter = MOSSE.MOSSE(self.currentImage,
+                                            (0, 0, self.currentBounds.width, self.currentBounds.height))
+
+        self.mosse_filter.update(frame, self.predicted_center)
+
+        if self.mosse_filter.good:
+            self.lifeTime += 1
+            self.mosse_active = True
+            # Don't reset the number of frames not tracked... MOSSE is only temporary if we lose tracking
+            # If MOSSE is missing it intermittently, we will destroy the track eventually
+
+            # Create new meta-object and update
+            new_center = self.mosse_filter.pos
+            new_bounds = Rectangle.create_centered_rect(new_center[0], new_center[1],
+                                                        self.currentBounds.width, self.currentBounds.height)
+            detectedObject = DetectedObject.createFromFrame(frame, new_bounds)
+
+            self.currentBounds = detectedObject.bounds
+            self.currentImage = detectedObject.image
+            # Don't update the descriptor... don't know if object is in good state (may be partially occluded)
+
+            # Update Kalman filter
+            self.kalman_filter.update(self.currentBounds.center_x, self.currentBounds.center_y)
+        else:
+            self.mosse_active = False
+            self.kalman_filter.predict()
+            self.numberOfFramesNotTracked += 1
+        """
         self.kalman_filter.predict()
         self.numberOfFramesNotTracked += 1
+        #"""
 
 
 def applyDetection(im, inFrame):
@@ -441,54 +542,6 @@ def applyDetection(im, inFrame):
             detectedObjects.append(DetectedObject.createFromFrame(inFrame, bounds))
 
     return detectedObjects
-
-
-def matchObjectTrack(detectedObject, track, matcher, MIN_PTS_THRESHOLD, frame_number):
-    if (len(detectedObject.keypoints) > 0) and (len(track.currentKeypoints) > 0):
-        matches = matcher.knnMatch(track.currentDescriptor, detectedObject.descriptors, k=2)
-
-        # Apply Lowe's ratio test to determine a good match
-        good = []
-        for match in matches:
-            if len(match) != 2:
-                continue
-
-            m, n = match
-            if m.distance <= RATIO_THRESHOLD * n.distance:
-                good.append(m)
-
-        goodMatches = []
-        if len(good) > 0:
-            # Using RANSAC to further improve the matching and eliminate wrong matches
-            src_pts = np.float32([track.currentKeypoints[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-            dst_pts = np.float32([detectedObject.keypoints[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
-
-            mask = []
-            M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-
-            if mask is not None:
-                matchesMask = mask.ravel().tolist()
-
-                index = 0
-                # print len(good)
-                # print mask.shape
-                for match in good:
-                    # print match
-                    m = match
-                    # print index
-                    # print len(matchesMask)
-                    if matchesMask[index]:
-                        goodMatches.append([m])
-                    index += 1
-
-            if len(goodMatches) > MIN_PTS_THRESHOLD:
-                match_img = cv2.drawMatchesKnn(track.currentImage, track.currentKeypoints,
-                                               detectedObject.image, detectedObject.keypoints,
-                                               goodMatches, None, flags=2)
-                #cv2.imshow(str(track.id), match_img)
-                #cv2.imwrite(str(frame_number) + "-" + str(track.id) + ".png",match_img)
-                return True
-    return False
 
 
 def combineObjectBounds(detectedObjects):
@@ -531,6 +584,7 @@ def calculateMatchOffer(track, detectedObject):
     else:
         size_ratio = trk_area / float(obj_area)
 
+    # Penalize by difference in size
     return calculateSIFTMatch(track, detectedObject) * (size_ratio**2)
 
 
@@ -582,7 +636,6 @@ def calculateSIFTMatch(track, detectedObject):
             # TODO What's a better score here?
 
             # If we can find a transform, we should have a very good match
-            # Penalize by the difference in size
             return ratio_sum * (len(goodMatches) + 1)
 
         # This should always be equal to 0
@@ -600,9 +653,10 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame):
     # Objects will keep the highest match score they receive, and will associate with that track.
     # We are exploiting track/object locality seeing as feature comparison isn't robust enough.
 
-    print '--- Frame:', frame_number
-    print '|  Tracks:', len(trackList)
-    print '| Objects:', len(detectedObjectsList)
+    if DEBUG_OUTPUT:
+        print '--- Frame:', frame_number
+        print '|  Tracks:', len(trackList)
+        print '| Objects:', len(detectedObjectsList)
 
     # Ask the tracks to make offers to the objects
     for track in trackList:
@@ -629,18 +683,20 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame):
             offerAmt = calculateMatchOffer(track, detectedObject)
 
             # TODO Force offer to match, even if failed
-            if offerAmt < 0:
-                offerAmt = 0  # Insignificant amount, but will match if no other tracks have a better offer
+            #if offerAmt < 0:
+                #offerAmt = 0  # Insignificant amount, but will match if no other tracks have a better offer
 
             offer_accepted = detectedObject.makeOffer(track, offerAmt)
 
-            print 'Offer made from Track', track.id, 'to Object', objectId, \
-                'for amount', offerAmt, '[Best]' if offer_accepted else ''
+            if DEBUG_OUTPUT:
+                print 'Offer made from Track', track.id, 'to Object', objectId, \
+                    'for amount', offerAmt, '[Best]' if offer_accepted else ''
 
     # Accept all offers
     for objectId, detectedObject in enumerate(detectedObjectsList):
         if detectedObject.acceptOffer():
-            print 'Best offer -- Track', detectedObject.bestTrack.id, 'matched to Object', objectId
+            if DEBUG_OUTPUT:
+                print 'Best offer -- Track', detectedObject.bestTrack.id, 'matched to Object', objectId
         else:
             # Object had no offer, make into new track
             if detectedObject.label != RANDOM_LABEL:
@@ -689,15 +745,13 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame):
             track.update(new_object, frame)
         elif not track.tracked:
             # Orphaned track (no one accepted an offer)
-            track.notifyOrphaned()
-
-            # TODO May use fallback tracking/matching method -- cut out the predicted window and try to find a match
+            track.notifyOrphaned(frame)
         # else, track was just created
 
     # Delete old, orphaned tracks (short-term memory approach)
     trackList[:] = [track for track in trackList if
                     (track.numberOfFramesNotTracked < NON_TRACKED_LIMIT) and
-                    (track.modeLabel != RANDOM_LABEL)]
+                    (not track.modeLabel == RANDOM_LABEL)]
 
 
 def drawObjects(detectedObjectList, frame):
@@ -709,16 +763,22 @@ def drawObjects(detectedObjectList, frame):
 
     return outputFrame
 
-
+imagecount = 0
 def drawTracks(trackList, frame):
+    global imagecount  # TODO Save image
+
     outputFrame = np.copy(frame)
 
-    """ NOTE : Use different colors for tracked tracks and predicted tracks """
     for track in trackList:
         # TODO DEBUG
         #cv2.imshow('Track' + str(track.id), track.currentImage)
 
         if track.tracked:
+            # TODO Save image
+            #cv2.imwrite('temp/' + str(imagecount) + '_sample.bmp', track.currentImage)
+            imagecount += 1
+            # TODO
+
             #print track.modeLabel
             if int(track.modeLabel) == CAR_LABEL:
                 label = "Car"
@@ -739,6 +799,11 @@ def drawTracks(trackList, frame):
             pred_bounds.center = track.predicted_center
             cv2.rectangle(outputFrame, (pred_bounds.x1, pred_bounds.y1),
                           (pred_bounds.x2, pred_bounds.y2), PREDICTED_COLOR, 1)
+
+            if track.mosse_active:
+                cv2.putText(outputFrame, '# ' + str(track.id), (track.currentBounds.x1,
+                                                                track.currentBounds.y1 - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, TEXT_COLOR, 1)
 
         # KALMAN
         cv2.circle(outputFrame, track.predicted_center, 4, PREDICTED_COLOR, 2)
@@ -763,6 +828,7 @@ def postProcessing(frame):
 
     return opening
 
+
 def identifyTrackMovements(track_list, gestures):
 
     clip_length = 30
@@ -775,6 +841,7 @@ def identifyTrackMovements(track_list, gestures):
 
         correct_gesture = get_gesture(frames_from_track, gestures)
         print correct_gesture[1]
+
 
 def get_gesture(frames_from_track, gestures):
 
@@ -794,6 +861,7 @@ def get_gesture(frames_from_track, gestures):
 
 def compute_subspace_difference(track, gesture):
     print(len(track) == len(gesture))
+
 
 def load_gestures(paths):
 
@@ -827,10 +895,6 @@ def load_gestures(paths):
     return gestures
 
 def main():
-    global sift
-    global hog
-    global clf
-
     # Disabling OpenCL here cause it causes problem using BackgroundSubstractor
     # Found out online that OpenCL bindings for openCV 3.1 are not working
     cv2.ocl.setUseOpenCL(False)
@@ -862,30 +926,9 @@ def main():
     # Creating the Foreground/Background segmentation based on MOG
     fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
-    # Create SIFT feature detector
-    sift = cv2.xfeatures2d.SIFT_create()
-
-    # initialize the HOG descriptor To extract feature from image center - These parameters will give 32 features vector
-    winSize = (8, 8)
-    blockSize = (8, 8)
-    blockStride = (8, 8)
-    cellSize = (2, 2)
-    nbins = 8
-    derivAperture = 1
-    winSigma = 4.
-    histogramNormType = 0
-    L2HysThreshold = 2.0000000000000001e-01
-    gammaCorrection = 0
-    nlevels = 64
-    hog = cv2.HOGDescriptor(winSize, blockSize, blockStride, cellSize, nbins, derivAperture, winSigma,
-                            histogramNormType, L2HysThreshold, gammaCorrection, nlevels)
-
-
-    # Load pre-trained SVM classifier
-    clf = joblib.load('SVM_OVOLinear_CarsPeopleRandom.pkl')
-
     #Load training gestures
-    gestures = load_gestures([r"C:\Users\trovi_000\Desktop\person15_walking_d1_uncomp.avi"])
+    # TODO
+    #gestures = load_gestures([r"C:\Users\trovi_000\Desktop\person15_walking_d1_uncomp.avi"])
 
     trackList = []
     # Main loop
@@ -937,7 +980,8 @@ def main():
 
 
         # Implement movement comparisons
-        identifyTrackMovements(trackList, gestures)
+        # TODO
+        #identifyTrackMovements(trackList, gestures)
 
 
 
