@@ -457,6 +457,8 @@ class Track(object):
         self.tracked = True
         self.acceptedOffers.append(detectedObject)
 
+
+
     def update(self, detectedObject, current_frame):
         """
         Matches the track to the given object
@@ -468,14 +470,22 @@ class Track(object):
         self.currentKeypoints = detectedObject.keypoints
         self.currentDescriptor = detectedObject.descriptors
 
-        if self.spaceBound.x1 > detectedObject.bounds.x1:
+        if self.waitPeriodforActionRecognition > 0:
+            if self.spaceBound.x1 > detectedObject.bounds.x1:
+                self.spaceBound.x1 = detectedObject.bounds.x1
+            if self.spaceBound.x2 < detectedObject.bounds.x2:
+                self.spaceBound.x2 = detectedObject.bounds.x2
+            if self.spaceBound.y1 > detectedObject.bounds.y1:
+                self.spaceBound.y1 = detectedObject.bounds.y1
+            if self.spaceBound.y2 < detectedObject.bounds.y2:
+                self.spaceBound.y2 = detectedObject.bounds.y2
+        else:
             self.spaceBound.x1 = detectedObject.bounds.x1
-        if self.spaceBound.x2 < detectedObject.bounds.x2:
             self.spaceBound.x2 = detectedObject.bounds.x2
-        if self.spaceBound.y1 > detectedObject.bounds.y1:
             self.spaceBound.y1 = detectedObject.bounds.y1
-        if self.spaceBound.y2 < detectedObject.bounds.y2:
             self.spaceBound.y2 = detectedObject.bounds.y2
+
+
 
         self.tracked = True
         self.acceptedOffers = []
@@ -673,7 +683,7 @@ def calculateSIFTMatch(track, detectedObject):
     return -1
 
 
-def vectorizeCube(cube):
+def vectorizeCubebyTime(cube):
 
     outputMatrix = np.zeros((CUBE_X*CUBE_Y, TRACKLET_LENGTH))
     for i in range(TRACKLET_LENGTH):
@@ -688,19 +698,67 @@ def vectorizeCube(cube):
     #print mean.shape, std.shape, outputMatrix.shape
     for i in range(TRACKLET_LENGTH):
         for x in range(CUBE_X*CUBE_Y):
+            outputMatrix[x, i] = (outputMatrix[x, i] - mean[x,]) / (std[x,] + 1)
+
+    #print outputMatrix
+    return outputMatrix
+
+
+def vectorizeCubebyWidth(cube):
+
+    outputMatrix = np.zeros((TRACKLET_LENGTH*CUBE_Y, CUBE_X))
+    for i in range(CUBE_X):
+        column = cube[i, :, :].reshape((TRACKLET_LENGTH*CUBE_Y))
+        outputMatrix[:, i] = column
+
+    #print outputMatrix
+    mean = np.mean(outputMatrix, axis=1)
+    std = np.std(outputMatrix, axis=1)
+    #print std
+    #print mean
+    #print mean.shape, std.shape, outputMatrix.shape
+    for i in range(CUBE_X):
+        for x in range(TRACKLET_LENGTH*CUBE_Y):
             outputMatrix[x, i] = (outputMatrix[x, i] - mean[x, ]) / (std[x, ] + 1)
 
     #print outputMatrix
     return outputMatrix
 
 
-def getEigenVectors(Cube):
-    Matrix = vectorizeCube(Cube)
+def vectorizeCubebyHeight(cube):
+
+    outputMatrix = np.zeros((TRACKLET_LENGTH*CUBE_X, CUBE_Y))
+    for i in range(CUBE_Y):
+        column = cube[:, i, :].reshape((TRACKLET_LENGTH*CUBE_X))
+        outputMatrix[:, i] = column
+
+    #print outputMatrix
+    mean = np.mean(outputMatrix, axis=1)
+    std = np.std(outputMatrix, axis=1)
+    #print std
+    #print mean
+    #print mean.shape, std.shape, outputMatrix.shape
+    for i in range(CUBE_Y):
+        for x in range(TRACKLET_LENGTH*CUBE_X):
+            outputMatrix[x, i] = (outputMatrix[x, i] - mean[x, ]) / (std[x, ] + 1)
+
+    #print outputMatrix
+    return outputMatrix
 
 
-    PCAresult = np.linalg.svd(np.dot(Matrix.T, Matrix))
+def getEigenVectors(cube):
+    matrixTime = vectorizeCubebyTime(cube)
+    matrixWidth = vectorizeCubebyWidth(cube)
+    matrixHeight = vectorizeCubebyHeight(cube)
 
-    return PCAresult[0]
+
+    PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
+    PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
+    PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
+
+
+    #print PCAresultTime[1]
+    return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
 
 
 def loadActionsDatabase(actionEigenvectorsPathsList):
@@ -727,7 +785,7 @@ def getPrincipalAnglesScores(database, testEigenvectors):
     scores = []
 
     for actionSet in database:
-        print actionSet.shape
+        #print actionSet.shape
         maxPrincipalAngle = 0
         for i in range(actionSet.shape[0]):
             gestureEigenvectors = actionSet[i, :, :]
@@ -739,10 +797,24 @@ def getPrincipalAnglesScores(database, testEigenvectors):
     return scores
 
 
-def actionRecognition(cube, database):
+def anglesDistance(scoresTime, scoresWidth, scoresHeight):
+    scores = []
+    for i in range(len(scoresTime)):
+        dist = math.sqrt(scoresTime[i] * scoresTime[i] + scoresWidth[i]*scoresWidth[i] + scoresHeight[i]*scoresHeight[i])
+        scores.append(dist)
 
-    eigenvectors = getEigenVectors(cube)
-    scores = getPrincipalAnglesScores(database, eigenvectors)
+    return scores
+
+
+def actionRecognition(cube, databaseTime, databaseWidth, databaseHeight):
+
+    eigenvectorsTime, eigenvectorsWidth, eigenvectorsHeight = getEigenVectors(cube)
+    scoresTime = getPrincipalAnglesScores(databaseTime, eigenvectorsTime)
+    scoresWidth = getPrincipalAnglesScores(databaseWidth, eigenvectorsWidth)
+    scoresHeight = getPrincipalAnglesScores(databaseHeight, eigenvectorsHeight)
+
+    scores = anglesDistance(scoresTime, scoresWidth, scoresHeight)
+
     maxScore = scores[0]
     maxIndex = 0
     for i in range(len(scores)):
@@ -766,7 +838,7 @@ def actionRecognition(cube, database):
         return "Undefined Motion"
 
 
-def updateAllTracks(trackList, detectedObjectsList, frame_number, frame, database):
+def updateAllTracks(trackList, detectedObjectsList, frame_number, frame, databaseTime, databaseWidth, databaseHeight):
     # TODO Note:
     # Before, we were assuming objects could match with more than one track...
     # Now, we are assuming that a track can match with more than one object!
@@ -882,12 +954,12 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame, databas
                     #print frames[i].shape
                     gray_image = cv2.cvtColor(frames[i], cv2.COLOR_BGR2GRAY)
                     box = gray_image[spaceBound.y1:spaceBound.y2, spaceBound.x1:spaceBound.x2]
-
-                    box = cv2.resize(box, (CUBE_X, CUBE_Y))
                     cv2.imshow('Cube', box)
+                    box = cv2.resize(box, (CUBE_X, CUBE_Y))
+
                     imageCube[:, :, i] = box
-                    print imageCube.shape
-                actionLabel = actionRecognition(imageCube, database)
+                    #print imageCube.shape
+                actionLabel = actionRecognition(imageCube, databaseTime, databaseWidth, databaseHeight)
                 track.actionLabel = actionLabel
                 track.waitPeriodforActionRecognition = 0
 
@@ -1072,9 +1144,17 @@ def main():
     fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
     #Load training gestures
-    database = loadActionsDatabase(['Data/boxingEigenvectors.npy', 'Data/handClappingEigenvectors.npy',
-                                    'Data/handWavingEigenvectors.npy', 'Data/joggingEigenvectors.npy',
-                                    'Data/runningEigenvectors.npy', 'Data/walkingEigenvectors.npy'])
+    databaseTime = loadActionsDatabase(['Data/boxingEigenvectorsTime.npy', 'Data/handClappingEigenvectorsTime.npy',
+                                    'Data/handWavingEigenvectorsTime.npy', 'Data/joggingEigenvectorsTime.npy',
+                                    'Data/runningEigenvectorsTime.npy', 'Data/walkingEigenvectorsTime.npy'])
+
+    databaseWidth = loadActionsDatabase(['Data/boxingEigenvectorsWidth.npy', 'Data/handClappingEigenvectorsWidth.npy',
+                                        'Data/handWavingEigenvectorsWidth.npy', 'Data/joggingEigenvectorsWidth.npy',
+                                        'Data/runningEigenvectorsWidth.npy', 'Data/walkingEigenvectorsWidth.npy'])
+
+    databaseHeight = loadActionsDatabase(['Data/boxingEigenvectorsHeight.npy', 'Data/handClappingEigenvectorsHeight.npy',
+                                        'Data/handWavingEigenvectorsHeight.npy', 'Data/joggingEigenvectorsHeight.npy',
+                                        'Data/runningEigenvectorsHeight.npy', 'Data/walkingEigenvectorsHeight.npy'])
 
     trackList = []
     # Main loop
@@ -1113,7 +1193,7 @@ def main():
         detectedObjectsList = applyDetection(filtered, frame)
 
         # Update all tracks
-        updateAllTracks(trackList, detectedObjectsList, frame_number, frame, database)
+        updateAllTracks(trackList, detectedObjectsList, frame_number, frame, databaseTime, databaseWidth, databaseHeight)
 
         outputFrame = drawObjects(detectedObjectsList, frame)
         outputFrame = drawTracks(trackList, outputFrame)
