@@ -33,7 +33,7 @@ def loadCube(Path):
     return Cube
 
 
-def vectorizeCube(cube):
+def vectorizeCubebyTime(cube):
 
     outputMatrix = np.zeros((BOX_X*BOX_Y, TRACK_LENGTH))
     for i in range(TRACK_LENGTH):
@@ -54,17 +54,66 @@ def vectorizeCube(cube):
     return outputMatrix
 
 
-def getEigenVectors(Cube):
-    Matrix = vectorizeCube(Cube)
+def vectorizeCubebyWidth(cube):
+
+    outputMatrix = np.zeros((TRACK_LENGTH*BOX_Y, BOX_X))
+    for i in range(BOX_X):
+        column = cube[i, :, :].reshape((TRACK_LENGTH*BOX_Y))
+        outputMatrix[:, i] = column
+
+    #print outputMatrix
+    mean = np.mean(outputMatrix, axis=1)
+    std = np.std(outputMatrix, axis=1)
+    #print std
+    #print mean
+    #print mean.shape, std.shape, outputMatrix.shape
+    for i in range(BOX_X):
+        for x in range(TRACK_LENGTH*BOX_Y):
+            outputMatrix[x, i] = (outputMatrix[x, i] - mean[x, ]) / (std[x, ] + 1)
+
+    #print outputMatrix
+    return outputMatrix
 
 
-    PCAresult = np.linalg.svd(np.dot(Matrix.T, Matrix))
+def vectorizeCubebyHeight(cube):
 
-    return PCAresult[0]
+    outputMatrix = np.zeros((TRACK_LENGTH*BOX_X, BOX_Y))
+    for i in range(BOX_Y):
+        column = cube[:, i, :].reshape((TRACK_LENGTH*BOX_X))
+        outputMatrix[:, i] = column
+
+    #print outputMatrix
+    mean = np.mean(outputMatrix, axis=1)
+    std = np.std(outputMatrix, axis=1)
+    #print std
+    #print mean
+    #print mean.shape, std.shape, outputMatrix.shape
+    for i in range(BOX_Y):
+        for x in range(TRACK_LENGTH*BOX_X):
+            outputMatrix[x, i] = (outputMatrix[x, i] - mean[x, ]) / (std[x, ] + 1)
+
+    #print outputMatrix
+    return outputMatrix
+
+
+def getEigenVectors(cube):
+    matrixTime = vectorizeCubebyTime(cube)
+    matrixWidth = vectorizeCubebyWidth(cube)
+    matrixHeight = vectorizeCubebyHeight(cube)
+
+
+    PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
+    PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
+    PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
+
+
+    return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
 
 
 def main():
-    eigenvectors = []
+    eigenvectorsTime = []
+    eigenvectorsWidth = []
+    eigenvectorsHeight = []
     index = 0
     with open("Data/walkingPath.txt") as f:
         for line in f:
@@ -75,10 +124,16 @@ def main():
             # Load Image to perform HOG descriptor
             cube = loadCube(path)
 
-            vectors = getEigenVectors(cube)
-            eigenvectors.append(vectors)
-    eigenvectors = np.array(eigenvectors)
-    np.save("Data/walkingEigenvectors", eigenvectors)
+            vectorsTime, vectorsWidth, vectorsHeight = getEigenVectors(cube)
+            eigenvectorsTime.append(vectorsTime)
+            eigenvectorsWidth.append(vectorsWidth)
+            eigenvectorsHeight.append(vectorsHeight)
+    eigenvectorsTime = np.array(eigenvectorsTime)
+    eigenvectorsWidth = np.array(eigenvectorsWidth)
+    eigenvectorsHeight = np.array(eigenvectorsHeight)
+    np.save("Data/walkingEigenvectorsTime", eigenvectorsTime)
+    np.save("Data/walkingEigenvectorsWidth", eigenvectorsWidth)
+    np.save("Data/walkingEigenvectorsHeight", eigenvectorsHeight)
 
 if __name__ == '__main__':
     main()
