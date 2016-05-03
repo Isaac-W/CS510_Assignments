@@ -232,13 +232,13 @@ def run_it(imgLen, winLen, blockLen, strideLen, cellLen, noout=False, full=False
         print '========================================='
         print 'PART I'
     s1, f1, r1, c1 = trainAndTest(cars_1, peds_1, rand_1, cars_2, peds_2, rand_2, noout)
-    print c1
+    #print c1
 
     if not noout:
         print '========================================='
         print 'PART II'
     s2, f2, r2, c2 = trainAndTest(cars_2, peds_2, rand_2, cars_1, peds_1, rand_1, noout)
-    print c2
+    #print c2
 
     # Add c1 to c2
     confusion = [[0, 0, 0] for x in range(LABEL_SIZE)]
@@ -265,14 +265,14 @@ def run_it(imgLen, winLen, blockLen, strideLen, cellLen, noout=False, full=False
 
 
 # TEST ALL COMBINATIONS
-"""
+#"""
 imgSizes = [64, 32, 16, 8]  # Size of scaled image
 winSizes = [32, 16, 8, 4]  # Size of input window
 blockSizes = [32, 16, 8, 4]  # Size of blocks (each block will have blockSize/cellSize cells)
 blockStrides = [32, 16, 8, 4, 2]  # Block shift (e.g. window 64, block 32, stride 16 will have 3 blocks per row)
 cellSizes = [32, 16, 8, 4, 2]  # Size of cell (a histogram is computed for each cell in a block)
 
-print 'Image, Window, Block, Stride, Cell, Result'
+print 'Image, Window, Block, Stride, Cell, CarsP, CarsR, CarsF, PedsP, PedsR, PedsF, RandP, RandR, RandF, AvgP, AvgR, AvgF'
 
 # Test all sizes
 for imgSize in imgSizes:
@@ -293,8 +293,34 @@ for imgSize in imgSizes:
                         continue
 
                     try:
-                        result = run_it(imgSize, winSize, blockSize, blockStride, cellSize, True, False)
-                        print str([imgSize, winSize, blockSize, blockStride, cellSize, result]).strip('[]')
+                        accuracy, confusion = run_it(imgSize, winSize, blockSize, blockStride, cellSize, True, False)
+
+                        # confusion[TRUTH][PREDICTED]
+                        #P = confusion[TRUTH][TRUTH] / float(confusion[LABEL_CARS][TRUTH] + confusion[LABEL_PEDS][TRUTH] + confusion[LABEL_RAND][TRUTH])
+                        #R = confusion[TRUTH][TRUTH] / float(confusion[TRUTH][LABEL_CARS] + confusion[TRUTH][LABEL_PEDS] + confusion[TRUTH][LABEL_RAND])
+                        
+                        carsP = confusion[LABEL_CARS][LABEL_CARS] / float(confusion[LABEL_CARS][LABEL_CARS] + confusion[LABEL_PEDS][LABEL_CARS] + confusion[LABEL_RAND][LABEL_CARS])
+                        carsR = confusion[LABEL_CARS][LABEL_CARS] / float(confusion[LABEL_CARS][LABEL_CARS] + confusion[LABEL_CARS][LABEL_PEDS] + confusion[LABEL_CARS][LABEL_RAND])
+                        carsF = 2 * (carsP * carsR) / (carsP + carsR)
+
+                        pedsP = confusion[LABEL_PEDS][LABEL_PEDS] / float(confusion[LABEL_CARS][LABEL_PEDS] + confusion[LABEL_PEDS][LABEL_PEDS] + confusion[LABEL_RAND][LABEL_PEDS])
+                        pedsR = confusion[LABEL_PEDS][LABEL_PEDS] / float(confusion[LABEL_PEDS][LABEL_CARS] + confusion[LABEL_PEDS][LABEL_PEDS] + confusion[LABEL_PEDS][LABEL_RAND])
+                        pedsF = 2 * (pedsP * pedsR) / (pedsP + pedsR)
+                        
+                        randP = confusion[LABEL_RAND][LABEL_RAND] / float(confusion[LABEL_CARS][LABEL_RAND] + confusion[LABEL_PEDS][LABEL_RAND] + confusion[LABEL_RAND][LABEL_RAND])
+                        randR = confusion[LABEL_RAND][LABEL_RAND] / float(confusion[LABEL_RAND][LABEL_CARS] + confusion[LABEL_RAND][LABEL_PEDS] + confusion[LABEL_RAND][LABEL_RAND])
+                        randF = 2 * (randP * randR) / (randP + randR)
+
+                        avgP = (carsP + pedsP + randP) / 3
+                        avgR = (carsR + pedsR + randR) / 3
+                        avgF = (carsF + pedsF + randF) / 3
+
+                        print str([imgSize, winSize, blockSize, blockStride, cellSize,
+                                   carsP, carsR, carsF,
+                                   pedsP, pedsR, pedsF,
+                                   randP, randR, randF,
+                                   avgP, avgR, avgF
+                                   ]).strip('[]')
                     except:
                         pass
 """
@@ -308,3 +334,4 @@ print 'Truth, Car, Ped, Rnd'
 print 'Car, ' + str(confusion[LABEL_CARS]).strip('[]')
 print 'Ped, ' + str(confusion[LABEL_PEDS]).strip('[]')
 print 'Rnd, ' + str(confusion[LABEL_RAND]).strip('[]')
+#"""
