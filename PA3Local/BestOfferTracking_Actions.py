@@ -66,9 +66,8 @@ CUBE_Y = 20
 BOXING = 0
 HAND_CLAPPING = 1
 HAND_WAVING = 2
-JOGGING = 3
-RUNNING = 4
-WALKING = 5
+RUNNING = 3
+WALKING = 4
 
 DIMENSIONS_TO_KEEP = 10
 
@@ -828,8 +827,6 @@ def actionRecognition(cube, databaseTime, databaseWidth, databaseHeight):
         return "Hand Clapping"
     elif maxIndex == HAND_WAVING:
         return "Hand Waving"
-    elif maxIndex == JOGGING:
-        return "Jogging"
     elif maxIndex == RUNNING:
         return  "Running"
     elif maxIndex == WALKING:
@@ -1145,16 +1142,16 @@ def main():
 
     #Load training gestures
     databaseTime = loadActionsDatabase(['Data/boxingEigenvectorsTime.npy', 'Data/handClappingEigenvectorsTime.npy',
-                                    'Data/handWavingEigenvectorsTime.npy', 'Data/joggingEigenvectorsTime.npy',
-                                    'Data/runningEigenvectorsTime.npy', 'Data/walkingEigenvectorsTime.npy'])
+                                    'Data/handWavingEigenvectorsTime.npy', 'Data/runningEigenvectorsTime.npy',
+                                        'Data/walkingEigenvectorsTime.npy'])
 
     databaseWidth = loadActionsDatabase(['Data/boxingEigenvectorsWidth.npy', 'Data/handClappingEigenvectorsWidth.npy',
-                                        'Data/handWavingEigenvectorsWidth.npy', 'Data/joggingEigenvectorsWidth.npy',
-                                        'Data/runningEigenvectorsWidth.npy', 'Data/walkingEigenvectorsWidth.npy'])
+                                        'Data/handWavingEigenvectorsWidth.npy', 'Data/runningEigenvectorsWidth.npy',
+                                         'Data/walkingEigenvectorsWidth.npy'])
 
     databaseHeight = loadActionsDatabase(['Data/boxingEigenvectorsHeight.npy', 'Data/handClappingEigenvectorsHeight.npy',
-                                        'Data/handWavingEigenvectorsHeight.npy', 'Data/joggingEigenvectorsHeight.npy',
-                                        'Data/runningEigenvectorsHeight.npy', 'Data/walkingEigenvectorsHeight.npy'])
+                                        'Data/handWavingEigenvectorsHeight.npy', 'Data/runningEigenvectorsHeight.npy',
+                                          'Data/walkingEigenvectorsHeight.npy'])
 
     trackList = []
     # Main loop
