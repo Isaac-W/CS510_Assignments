@@ -1,7 +1,7 @@
 import math
 import cv2
 import numpy as np
-import skvideo.io
+#import skvideo.io
 from sklearn.externals import joblib
 import sys
 from scipy import stats
@@ -17,16 +17,16 @@ BOX_Y = 20
 BOXING = 0
 HAND_CLAPPING = 1
 HAND_WAVING = 2
-JOGGING = 3
-RUNNING = 4
-WALKING = 5
+RUNNING = 3
+WALKING = 4
 
 DIMENSIONS_TO_KEEP = 5
 
 
 def loadCube(Path):
     Cube = np.zeros((BOX_Y, BOX_X, TRACK_LENGTH))
-    cap = skvideo.io.VideoCapture(Path)
+    #cap = skvideo.io.VideoCapture(Path)
+    cap = cv2.VideoCapture(Path)
     if not cap.isOpened():
         print 'Error--Unable to open video:', Path
         return
@@ -137,16 +137,16 @@ def subspaceSimilarity(testEigenvectors, gestEigenvectors, dim):
 
     return finalPCA[1][0]
 
-def getPrincipalAnglesScores(database, testEigenvectors):
+def getPrincipalAnglesScores(database, testEigenvectors, dim_to_keep):
 
     scores = []
 
     for actionSet in database:
-        print actionSet.shape
+        #print actionSet.shape
         maxPrincipalAngle = 0
         for i in range(actionSet.shape[0]):
             gestureEigenvectors = actionSet[i, :, :]
-            score = subspaceSimilarity(testEigenvectors, gestureEigenvectors, DIMENSIONS_TO_KEEP)
+            score = subspaceSimilarity(testEigenvectors, gestureEigenvectors, dim_to_keep)
             if score > maxPrincipalAngle:
                 maxPrincipalAngle = score
         scores.append(maxPrincipalAngle)
@@ -179,9 +179,9 @@ def main():
     testCube = loadCube("Data/Walking/person01_walking_d1_uncomp_sample0.avi")
     testEigenvectorsTime, testEigenvectorsWidth, testEigenvectorsHeight = getEigenVectors(testCube)
 
-    scoresTime = getPrincipalAnglesScores(databaseTime, testEigenvectorsTime)
-    scoresWidth = getPrincipalAnglesScores(databaseWidth, testEigenvectorsWidth)
-    scoresHeight = getPrincipalAnglesScores(databaseHeight, testEigenvectorsHeight)
+    scoresTime = getPrincipalAnglesScores(databaseTime, testEigenvectorsTime, DIMENSIONS_TO_KEEP)
+    scoresWidth = getPrincipalAnglesScores(databaseWidth, testEigenvectorsWidth, DIMENSIONS_TO_KEEP)
+    scoresHeight = getPrincipalAnglesScores(databaseHeight, testEigenvectorsHeight, DIMENSIONS_TO_KEEP)
 
     scores = anglesDistance(scoresTime, scoresWidth, scoresHeight)
 
