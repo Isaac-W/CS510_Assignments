@@ -126,11 +126,19 @@ def test(databaseT, databaseW, databaseH, file_list, dim_to_keep):
         # Get test eigenvectors
         teT, teW, teH = getEigenVectors(testCube)
 
-        scores = getPrincipalAnglesScores(databaseT, teT, dim_to_keep)
-        #scoresWidth = getPrincipalAnglesScores(databaseW, teW, dim_to_keep)
-        #scoresHeight = getPrincipalAnglesScores(databaseH, teH, dim_to_keep)
+        scoresTime = getPrincipalAnglesScores(databaseT, teT, dim_to_keep)
+        scoresWidth = getPrincipalAnglesScores(databaseW, teW, dim_to_keep)
+        scoresHeight = getPrincipalAnglesScores(databaseH, teH, dim_to_keep)
 
-        #scores = anglesDistance(scoresTime, scoresWidth, scoresHeight)
+        scores = anglesDistance(scoresTime, scoresWidth, scoresHeight)
+
+        """
+        best_list = []
+        for label, best_five in enumerate(best):
+            for val in best_five:
+                best_list.append((label, best_five))
+        best_list.sort()
+        """
 
         # Find best score (predicted label)
         maxScore = scores[0]
@@ -148,7 +156,7 @@ def test(databaseT, databaseW, databaseH, file_list, dim_to_keep):
 
 
 def main():
-    #"""
+    """
     # Build training database
     boxing_list = getImgList(BOXING_PATH)
     handclapping_list = getImgList(CLAPPING_PATH)
@@ -193,7 +201,7 @@ def main():
     print ', Boxing, Clapping, Waving, Running, Walking'
     for i, pred in enumerate(confusion):
         print ACTION_LABELS[i] + ', ' + str(pred).strip('[]')
-    """
+    #"""
 
 
 if __name__ == '__main__':

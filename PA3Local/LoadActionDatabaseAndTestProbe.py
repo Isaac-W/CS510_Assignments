@@ -111,12 +111,18 @@ def getEigenVectors(cube):
     matrixHeight = vectorizeCubebyHeight(cube)
 
 
-    PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
-    PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
-    PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
+    #PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
+    #PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
+    #PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
 
 
-    return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
+    #return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
+
+    PCAresultTime = cv2.PCACompute(matrixTime.T, None)
+    PCAresultWidth = cv2.PCACompute(matrixWidth.T, None)
+    PCAresultHeight = cv2.PCACompute(matrixHeight.T, None)
+
+    return PCAresultTime[1][:5], PCAresultWidth[1][:5], PCAresultHeight[1][:5]
 
 
 def loadActionsDatabase(actionEigenvectorsPathsList):
@@ -140,16 +146,24 @@ def subspaceSimilarity(testEigenvectors, gestEigenvectors, dim):
 def getPrincipalAnglesScores(database, testEigenvectors, dim_to_keep):
 
     scores = []
+    #best_fives = []
 
     for actionSet in database:
         #print actionSet.shape
         maxPrincipalAngle = 0
+        #all_scores = []
+
         for i in range(actionSet.shape[0]):
             gestureEigenvectors = actionSet[i, :, :]
             score = subspaceSimilarity(testEigenvectors, gestureEigenvectors, dim_to_keep)
             if score > maxPrincipalAngle:
                 maxPrincipalAngle = score
+            #all_scores.append(score)
+
         scores.append(maxPrincipalAngle)
+
+        #all_scores.sort(reverse=True)
+        #best_fives.append(all_scores[:5])
 
     return scores
 
@@ -179,9 +193,9 @@ def main():
     testCube = loadCube("Data/Walking/person01_walking_d1_uncomp_sample0.avi")
     testEigenvectorsTime, testEigenvectorsWidth, testEigenvectorsHeight = getEigenVectors(testCube)
 
-    scoresTime = getPrincipalAnglesScores(databaseTime, testEigenvectorsTime, DIMENSIONS_TO_KEEP)
-    scoresWidth = getPrincipalAnglesScores(databaseWidth, testEigenvectorsWidth, DIMENSIONS_TO_KEEP)
-    scoresHeight = getPrincipalAnglesScores(databaseHeight, testEigenvectorsHeight, DIMENSIONS_TO_KEEP)
+    scoresTime, bestTime = getPrincipalAnglesScores(databaseTime, testEigenvectorsTime, DIMENSIONS_TO_KEEP)
+    scoresWidth, bestWidth = getPrincipalAnglesScores(databaseWidth, testEigenvectorsWidth, DIMENSIONS_TO_KEEP)
+    scoresHeight, bestHeight = getPrincipalAnglesScores(databaseHeight, testEigenvectorsHeight, DIMENSIONS_TO_KEEP)
 
     scores = anglesDistance(scoresTime, scoresWidth, scoresHeight)
 
