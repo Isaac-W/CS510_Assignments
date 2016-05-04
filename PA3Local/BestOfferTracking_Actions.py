@@ -1,7 +1,7 @@
 import math
 import cv2
 import numpy as np
-import skvideo.io
+#import skvideo.io
 from sklearn.externals import joblib
 import sys
 from scipy import stats
@@ -69,7 +69,7 @@ HAND_WAVING = 2
 RUNNING = 3
 WALKING = 4
 
-DIMENSIONS_TO_KEEP = 10
+DIMENSIONS_TO_KEEP = 5
 
 
 def initFeatureExtractors():
@@ -751,13 +751,18 @@ def getEigenVectors(cube):
     matrixHeight = vectorizeCubebyHeight(cube)
 
 
-    PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
-    PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
-    PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
+    #PCAresultTime = np.linalg.svd(np.dot(matrixTime.T, matrixTime))
+    #PCAresultWidth = np.linalg.svd(np.dot(matrixWidth.T, matrixWidth))
+    #PCAresultHeight = np.linalg.svd(np.dot(matrixHeight.T, matrixHeight))
 
 
-    #print PCAresultTime[1]
-    return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
+    #return PCAresultTime[0], PCAresultWidth[0], PCAresultHeight[0]
+
+    PCAresultTime = cv2.PCACompute(matrixTime.T, None)
+    PCAresultWidth = cv2.PCACompute(matrixWidth.T, None)
+    PCAresultHeight = cv2.PCACompute(matrixHeight.T, None)
+
+    return PCAresultTime[1][:DIMENSIONS_TO_KEEP], PCAresultWidth[1][:DIMENSIONS_TO_KEEP], PCAresultHeight[1][:DIMENSIONS_TO_KEEP]
 
 
 def loadActionsDatabase(actionEigenvectorsPathsList):
@@ -1115,8 +1120,8 @@ def main():
     source_path = sys.argv[1] if len(sys.argv) > 1 else 0
 
     # Using skvideo to load and write videos because of codecs issue under Linux
-    #cap = cv2.VideoCapture(source_path)
-    cap = skvideo.io.VideoCapture(source_path)
+    cap = cv2.VideoCapture(source_path)
+    #cap = skvideo.io.VideoCapture(source_path)
 
     if not cap.isOpened():
         print 'Error--Unable to open video:', source_path
@@ -1126,21 +1131,22 @@ def main():
     truthAvailable = truthCap.isOpened()
 
     # Get video parameters (try to retain same attributes for output video)
-    width = cap.width
-    height = cap.height
-    #width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    #height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    #fps = float(cap.get(cv2.CAP_PROP_FPS))
-    #codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+    #width = cap.width
+    #height = cap.height
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
 
-    skvideo_writer = skvideo.io.VideoWriter("Actions.avi", frameSize=(width, height))
-    skvideo_writer.open()
-    #dst_writer = cv2.VideoWriter("output.avi", codec, fps if fps > 0 else 30, (width, height))
+    #skvideo_writer = skvideo.io.VideoWriter("Actions.avi", frameSize=(width, height))
+    #skvideo_writer.open()
+    dst_writer = cv2.VideoWriter("output.avi", codec, fps if fps > 0 else 30, (width, height))
 
     # Creating the Foreground/Background segmentation based on MOG
     fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
     #Load training gestures
+    """
     databaseTime = loadActionsDatabase(['Data/boxingEigenvectorsTime.npy', 'Data/handClappingEigenvectorsTime.npy',
                                     'Data/handWavingEigenvectorsTime.npy', 'Data/runningEigenvectorsTime.npy',
                                         'Data/walkingEigenvectorsTime.npy'])
@@ -1152,6 +1158,11 @@ def main():
     databaseHeight = loadActionsDatabase(['Data/boxingEigenvectorsHeight.npy', 'Data/handClappingEigenvectorsHeight.npy',
                                         'Data/handWavingEigenvectorsHeight.npy', 'Data/runningEigenvectorsHeight.npy',
                                           'Data/walkingEigenvectorsHeight.npy'])
+    """
+
+    databaseTime = np.load('Data/dbEigenvectorsTime.npy')
+    databaseWidth = np.load('Data/dbEigenvectorsWidth.npy')
+    databaseHeight = np.load('Data/dbEigenvectorsHeight.npy')
 
     trackList = []
     # Main loop
@@ -1199,26 +1210,21 @@ def main():
         cv2.imshow("Input", outputFrame)
         cv2.imshow("Foreground", fgmask)
 
-
-
-
         # Implement movement comparisons
         # TODO
         #identifyTrackMovements(trackList, gestures)
 
-
-
         # Write Video To file
-        skvideo_writer.write(outputFrame)
-        #dst_writer.write(outputFrame)
+        #skvideo_writer.write(outputFrame)
+        dst_writer.write(outputFrame)
 
         k = cv2.waitKey(30) & 0xff
         if k == 27:
             break
 
-    skvideo_writer.release()
+    #skvideo_writer.release()
 
-    #dst_writer.release()
+    dst_writer.release()
     cap.release()
 
 

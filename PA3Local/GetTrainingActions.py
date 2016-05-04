@@ -79,8 +79,13 @@ def main():
                 roi_vals = vals[i].split('-')
                 roi.append((int(roi_vals[0]), int(roi_vals[1])))
 
-            create_training_videos(label, path, roi, sys.argv[2])
+            folder_name = path.split('/')[0]
+            out_path = sys.argv[2] + '/' + folder_name
 
+            if not os.path.exists(out_path):
+                os.mkdir(out_path)
+
+            create_training_videos(label, path, roi, out_path)
 
 
 if __name__ == '__main__':
