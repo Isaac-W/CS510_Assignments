@@ -58,7 +58,7 @@ hog = None
 clf = None
 
 # Action Recognition Parameters
-ACTION_RECOGNITION_WAIT_PERIOD = 30
+ACTION_RECOGNITION_WAIT_PERIOD = 15
 TRACKLET_LENGTH = 30
 CUBE_X = 20
 CUBE_Y = 20
@@ -430,6 +430,8 @@ class Track(object):
 
         self.labelsList = [detectedObject.label]
         self.modeLabel = detectedObject.label
+
+        self.actionLabel_list = []
 
         self.most_recent_frames = []
 
@@ -962,7 +964,8 @@ def updateAllTracks(trackList, detectedObjectsList, frame_number, frame, databas
                     imageCube[:, :, i] = box
                     #print imageCube.shape
                 actionLabel = actionRecognition(imageCube, databaseTime, databaseWidth, databaseHeight)
-                track.actionLabel = actionLabel
+                # track.actionLabel = actionLabel
+                track.actionLabel_list.append(actionLabel)
                 track.waitPeriodforActionRecognition = 0
 
 
@@ -1006,11 +1009,15 @@ def drawTracks(trackList, frame):
             else:
                 label = "Unknown"
 
+            if len(track.actionLabel_list) > 0:
+                track.actionLabel = stats.mode(track.actionLabel_list[-3:])[0][0]
+            else: track.actionLabel = ''
+
             cv2.rectangle(outputFrame, (track.currentBounds.x1, track.currentBounds.y1),
                           (track.currentBounds.x2, track.currentBounds.y2), TRACKED_COLOR, 1)
             cv2.putText(outputFrame, '# ' + str(track.id) + " - " + label + " - " + track.actionLabel, (track.currentBounds.x1,
                                                                             track.currentBounds.y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, TEXT_COLOR, 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, TEXT_COLOR, 1)
 
             cv2.circle(outputFrame, track.currentBounds.center, 8, (255,0,0), 5)
         else:
